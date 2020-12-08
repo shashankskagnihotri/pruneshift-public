@@ -7,7 +7,8 @@ Trainer:
   benchmark: True 
 
 DataModule:
-  _target_: pruneshift.lottery.data.MNISTDataModule
-  dataset_path: ${env:DATASET_PATH}
+  _target_: pruneshift.datamodule
+  name: CIFAR10
+  root: ${env:DATASET_PATH}
   batch_size: 32
   num_workers: 10

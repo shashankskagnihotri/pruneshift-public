@@ -1,13 +1,4 @@
-""" Provides the data modules we need for our experiments.
-
-A Datamodule must be explicitly provided.
-
-Transform Mixins
-
-Registration of Databases
-
-
-"""
+""" Provides the data modules we need for our experiments."""
 import abc
 
 from torch.utils.data import DataLoader, random_split, Dataset
@@ -22,7 +13,8 @@ from .datasets import CIFAR10C
 def datamodule(name: str,
                root: str,
                batch_size: int = 32,
-               num_workers: int = 5) -> pl.LightningDataModule:
+               num_workers: int = 5,
+               **kwargs) -> pl.LightningDataModule:
     """Creates a LightningDataModule.
 
     Args:
@@ -33,7 +25,7 @@ def datamodule(name: str,
     Returns:
         The corresponding LightningDataModule.
     """
-    return BaseDataModule.subclasses[name](root, batch_size, num_workers)
+    return BaseDataModule.subclasses[name](root, batch_size, num_workers, **kwargs)
 
 
 
@@ -52,8 +44,8 @@ class BaseDataModule(pl.LightningDataModule):
         self.val_dataset = None
         self.test_dataset = None
 
-    def create_dataloader(self, dataset):
-        if not isinstance(dataset, Dataset):
+    def _create_dataloader(self, dataset):
+        if isinstance(dataset, (tuple, list)):
             # If not a dataset we assume a list/tuple of datasets.
             return [self._create_dataloader(d) for d in dataset]
         return DataLoader(dataset,
@@ -64,7 +56,7 @@ class BaseDataModule(pl.LightningDataModule):
     def __init_subclass__(cls, **kwargs):
         # Add subclasses to the module.
         super().__init_subclass__(**kwargs)
-        cls.subclasses[cls.__name__] = cls
+        cls.subclasses[cls.name] = cls
 
     def transform(self, train: bool = False):
         return transforms.ToTensor()
@@ -79,7 +71,22 @@ class BaseDataModule(pl.LightningDataModule):
         return self._create_dataloader(self.test_dataset)
 
 
-class CIFAR10Transform:
+class CIFAR10Module(BaseDataModule):
+    name = "CIFAR10"
+
+    def prepare_data(self):
+        torch_datasets.CIFAR10(self.root, train=True, download=True)
+        torch_datasets.CIFAR10(self.root, train=False, download=True)
+
+    def setup(self, stage):
+        create_fn = torch_datasets.CIFAR10 
+        self.test_dataset = create_fn(self.root, transform=self.transform())
+                         
+        trainset = create_fn(self.root, transform=self.transform(True))
+        trainset, valset = random_split(trainset, [45000, 5000])
+        self.train_dataset = trainset
+        self.val_dataset = valset
+
     def transform(self, train: bool = False):
         transform = []
         mean, std = (0.491, 0.482, 0.447), (0.247, 0.243, 0.262)
@@ -93,30 +100,16 @@ class CIFAR10Transform:
         return transforms.Compose(transform)
 
 
-class CIFAR10(CIFAR10Transform, BaseDataModule):
-    def prepare_data(self):
-        torch_datasets.CIFAR10(self.root, train=True, download=True)
-        torch_datasets.CIFAR10(self.root, train=False, download=True)
+# TODO: Multiple datasets!
+class CIFAR10CModule(CIFAR10Module):
+    name = "CIFAR10Corrupted"
 
-    def setup(self, stage):
-        create_fn = torch_datasets.CIFAR10 
-        self.testset = create_fn(self.root, transform=self.transform())
-                         
-        trainset = create_fn(self.root, transform=self.transform(True))
-        trainset, valset = random_split(trainset, [55000, 5000])
-        self.train_dataset = trainset
-        self.val_dataset = valset
-
-
-
-# TODO: Make it possible to have multiple datasets.
-class CIFAR10C(CIFAR10Transform, BaseDataModule):
     def __init__(self,
                  root: str,
+                 batch_size: int,
+                 num_workers: int,
                  distortion: str,
-                 lvl: int = 1,
-                 batch_size: int = 32,
-                 num_workers: int = 5):
+                 lvl: int = 1):
         super().__init__(root, batch_size, num_workers)
         self.distortion = distortion
         self.lvl = lvl
@@ -126,13 +119,9 @@ class CIFAR10C(CIFAR10Transform, BaseDataModule):
         CIFAR10C(self.root, "snow", lvl=1)
 
     def setup(self, stage):
-        self.train_dataset = CIFAR10(self.root, transform=self.transform(True))
-        test_set = CIFAR10(self.root, train=False,
-                           transform=self.transform())
         # Now add the corrupted set.
-        test_set_corr= CIFAR10C(root=self.root,
-                                transform=self.transform(),
-                                distortion=self.distortion,
-                                lvl=self.lvl)
-        self.test_dataset = [test_set, test_set_corr]
+        self.test_dataset = CIFAR10C(root=self.root,
+                                     transform=self.transform(),
+                                     distortion=self.distortion,
+                                     lvl=self.lvl)
 

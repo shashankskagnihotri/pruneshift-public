@@ -1,5 +1,7 @@
 import os
+import glob
 from urllib.request import urlopen
+from pathlib import Path
 
 import numpy as np
 import torch
@@ -43,6 +45,11 @@ class CIFAR10C(ExternalDataset):
         self.lvl = lvl
         self._images = np.load(self.image_path)
         self._labels = np.load(self.label_path)
+
+    @property
+    def list_distortions(self):
+        files = glob.glob(os.path.join(self.path, "*.npy"))
+        return [Path(f).stem for f in files]
 
     @property
     def image_path(self):

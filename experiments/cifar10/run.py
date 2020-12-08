@@ -1,6 +1,7 @@
-# TODO: We need a way to create a resnet50 model.
-# TODO: We need a way to create the Cifar10 data module.
-#       I just want to have a function that returns me the Cifar10
+# TODO: We need a way to create a resnet50 model,
+#       it should support pre_trained and custom models.
+# TODO: Train a resnet50 model.
+
 
 import os
 
@@ -11,6 +12,9 @@ from pytorch_lightning.metrics.functional import accuracy
 import torch
 import torch.nn as nn
 from torch.nn import functional as F
+import torchvision.models as models
+
+from pruneshift import datamodule
 
 
 class TrainingModule(pl.LightningModule):
@@ -43,10 +47,18 @@ class TrainingModule(pl.LightningModule):
         self.log("Validation/Loss", loss)
         self.log("Validation/Accuracy", acc)
 
+    def configure_optimizers(self):
+        return torch.optim.Adam(self.parameters(), lr=self.lr)
+
+
 
 @hydra.main(config_name="config")
 def run(cfg):
-    pass
+    data = instantiate(cfg.DataModule)
+    trainer = instantiate(cfg.Trainer)
+    model = models.resnet18(pretrained=True)
+    module = TrainingModule(model)
+    trainer.fit(module, datamodule=data)
 
 
 if __name__ == "__main__":
