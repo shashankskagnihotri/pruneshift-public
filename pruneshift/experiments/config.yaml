@@ -1,0 +1,13 @@
+Trainer:
+  _target_: pytorch_lightning.Trainer
+  default_root_dir: ${env:EXPERIMENT_PATH}
+  gpus: 1
+  progress_bar_refresh_rate: 20
+  max_epochs: 1
+  benchmark: True 
+
+DataModule:
+  _target_: pruneshift.lottery.data.MNISTDataModule
+  dataset_path: ${env:DATASET_PATH}
+  batch_size: 32
+  num_workers: 10
