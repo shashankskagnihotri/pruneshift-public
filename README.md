@@ -1,25 +1,18 @@
-Start an experiment with
-```bash
-python -m pruneshift.run
-```
+# PruneShift
 
-Accessing System Variables can be done by the following:
-```python
-os.environ["VarName"]
-```
-Framework to prune. We use the pytorch pruner
+## Structure
 
-Data Module can return multiple loaders for different test sets the `test_step` argument
-than is able to find out the idx of the `data_loader`.
-    
+| `jupyter/` | Visualization |
+| `pruneshift/` | Provides models, pruning methods and datasets |
+| `experiments/` | Lightning scripts for the experiments |
 
-*Workflow*
+## Workflow
  - Work with vim and jupyter.
  - Jupyter for explorative programming and experiments.
  - rsync to synchronize to dacky.
  - And occasionally git to github.
 
-*Current thoughts*
+## Current thoughts
 - TODOS:
     - Reading the ImageNet-C paper completely.
     - DATAMODULE IS MISSING ~ 1H
@@ -32,11 +25,9 @@ than is able to find out the idx of the `data_loader`.
     - 2. Make a basic run and than prune percentage wise.
     - Pruning methods that we want to integrate ~ 3h:
         SyncFlow, Structured Pruning and so on..
+    - Look into lsyncd.
 
-*Open questions*
-1. Differences between structural pruning and NAS.
-
-*Zen garden*
-- flat structures!
-- 
-
+## Zen garden
+- We want to do experiments not frameworks!
+- Code is also configuration!
+- Speed matters!
