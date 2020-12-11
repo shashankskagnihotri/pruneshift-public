@@ -1,14 +1,10 @@
-# TODO: We need a way to create a resnet50 model,
-#       it should support pre_trained and custom models.
-# TODO: Train a resnet50 model.
-
-
 import os
 
 import hydra
 from hydra.utils import instantiate
 import pytorch_lightning as pl
 from pytorch_lightning.metrics.functional import accuracy
+from pytorch_lightning import loggers as pl_loggers
 import torch
 import torch.nn as nn
 from torch.nn import functional as F
@@ -51,13 +47,15 @@ class TrainingModule(pl.LightningModule):
         return torch.optim.Adam(self.parameters(), lr=self.lr)
 
 
-
 @hydra.main(config_name="config")
 def run(cfg):
+    if cfg.seed is not None:
+        pl.seed_everything(cfg.seed)
+
     data = instantiate(cfg.DataModule)
-    trainer = instantiate(cfg.Trainer)
-    model = models.resnet18(pretrained=True)
-    module = TrainingModule(model)
+    trainer: pl.Trainer = instantiate(cfg.Trainer)
+    model = models.resnet18(num_classes=10)
+    module = instantiate(cfg.TrainingModule)
     trainer.fit(module, datamodule=data)
 
 
