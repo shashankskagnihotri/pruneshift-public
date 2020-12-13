@@ -7,6 +7,7 @@ import torch.nn as nn
 BASIC_MODULE_MAP = {nn.Linear: ["bias", "weight"], nn.Conv2d: ["bias", "weight"]}
 
 
+
 def simple_prune(
     module: nn.Module,
     pruning_method: prune.BasePruningMethod,

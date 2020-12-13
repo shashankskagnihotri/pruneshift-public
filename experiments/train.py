@@ -54,12 +54,10 @@ def run(cfg):
         pl.seed_everything(cfg.seed)
 
     checkpoint_callback = ModelCheckpoint(save_top_k=-1, save_weights_only=True)
-
-    data = instantiate(cfg.DataModule)
+    data: pl.LightningDataModule = instantiate(cfg.DataModule)
     trainer: pl.Trainer = instantiate(cfg.Trainer, callbacks=[checkpoint_callback])
-    model = models.resnet50(num_classes=10)
-    module = instantiate(cfg.TrainingModule,
-                         network=model)
+    network: nn.Module = instantiate(cfg.Network)
+    module = instantiate(cfg.TrainingModule, network=network)
     trainer.fit(module, datamodule=data)
 
 

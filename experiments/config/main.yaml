@@ -1,6 +1,6 @@
+seed: 1
 TrainingModule:
-    _target_: cifar10.TrainingModule
-    lr: 0.0003
+    _target_: oneshot.TestModule
 
 Trainer:
   _target_: pytorch_lightning.Trainer
@@ -16,7 +16,7 @@ Network:
 
 DataModule:
   _target_: pruneshift.datamodule
-  name: CIFAR10
+  name: CIFAR10Corrupted
   root: ${env:DATASET_PATH}
   batch_size: 128
   num_workers: 10

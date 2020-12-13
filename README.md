@@ -14,9 +14,21 @@
 
 ## Current thoughts
 - TODOS:
-    - Make a training run where we checkpoint each iteration.
-    - We use ResNet50
+    - MAKE THE FOLLOWING STRUCTURE FOR THE FOLDERS:
+        dataset_network/lightning_logs/version1/epoch_{0}
+    - PROVIDE A BETTER DATAMODULE FOR CIFAR10C
+    - Test Magnitude Pruning on the checkpointed networks.
 
+- Optional TODODS:
+    - Better config structure:
+        Folder structure:
+            config/
+                main.yaml # Contains basic settings like directory template.
+
+        We can overwrite params.
+        https://hydra.cc/docs/patterns/specializing_config
+    - Fractor out the code for the experiments into the module code:
+        A Trainer Module
     
 
 ## Hypothesis

@@ -1,5 +1,11 @@
 """Provides network topologies."""
 import torch.nn as nn
+import torchvision.models as torch_models
+
+
+def topology(name: str, **kwargs):
+    network_fn = getattr(torch_models, name)
+    return network_fn(**kwargs)
 
 
 def conv_n_lottery(N: int = 2, num_classes: int = 10):

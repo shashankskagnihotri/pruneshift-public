@@ -1,14 +1,20 @@
+seed: 0
+defaults:
+    - dataset: cifar10.yaml
+
 Trainer:
-  _target_: pytorch_lightning.Trainer
-  default_root_dir: ${env:EXPERIMENT_PATH}
   gpus: 1
   progress_bar_refresh_rate: 20
   max_epochs: 1
   benchmark: True 
 
 DataModule:
-  _target_: pruneshift.datamodule
   name: CIFAR10
   root: ${env:DATASET_PATH}
-  batch_size: 32
+  batch_size: 128
   num_workers: 10
+
+hydra:
+    run:
+        dir: ${env:EXPERIMENT_PATH}/${hydra.job.name}/
+
