@@ -74,16 +74,17 @@ class CIFAR10Module(BaseDataModule):
         torch_datasets.CIFAR10(self.root, train=True, download=True)
         torch_datasets.CIFAR10(self.root, train=False, download=True)
 
-    def setup(self, stage):
+    def setup(self, stage: str) -> None:
         create_fn = torch_datasets.CIFAR10
-        self.test_dataset = create_fn(self.root, transform=self.transform())
+        self.test_dataset = create_fn(self.root, False,
+                                      transform=self.transform(False))
 
-        trainset = create_fn(self.root, transform=self.transform(True))
+        trainset = create_fn(self.root, True, transform=self.transform())
         trainset, valset = random_split(trainset, [45000, 5000])
         self.train_dataset = trainset
         self.val_dataset = valset
 
-    def transform(self, train: bool = False):
+    def transform(self, train: bool = True):
         transform = []
         mean, std = (0.491, 0.482, 0.447), (0.247, 0.243, 0.262)
 
@@ -115,12 +116,12 @@ class CIFAR10CModule(CIFAR10Module):
 
     def setup(self, stage):
         # Add the benign set.
-        datasets = [torch_datasets.CIFAR10(self.root, False, self.transform())]
+        datasets = [torch_datasets.CIFAR10(self.root, False, self.transform(False))]
 
         # Add the evil sets.
         for distortion in CIFAR10C.distortions_list:
             d = CIFAR10C(
-                root=self.root, transform=self.transform(), distortion=distortion
+                root=self.root, transform=self.transform(False), distortion=distortion
             )
             datasets.extend(d.lvl_subsets())
 

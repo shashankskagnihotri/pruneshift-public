@@ -1,17 +1,12 @@
-import os
-
 import hydra
 from hydra.utils import instantiate
 import pytorch_lightning as pl
 from pytorch_lightning.metrics.functional import accuracy
-from pytorch_lightning import loggers as pl_loggers
 from pytorch_lightning.callbacks import ModelCheckpoint
 import torch
 import torch.nn as nn
 from torch.nn import functional as F
 import torchvision.models as models
-
-from pruneshift import datamodule
 
 
 class TrainingModule(pl.LightningModule):
@@ -50,14 +45,14 @@ class TrainingModule(pl.LightningModule):
 
 @hydra.main(config_name="config")
 def run(cfg):
-    if cfg.seed is not None:
-        pl.seed_everything(cfg.seed)
+    # if cfg.seed is not None:
+    #     pl.seed_everything(cfg.seed)
 
     checkpoint_callback = ModelCheckpoint(save_top_k=-1, save_weights_only=True)
 
     data = instantiate(cfg.DataModule)
     trainer: pl.Trainer = instantiate(cfg.Trainer, callbacks=[checkpoint_callback])
-    model = models.resnet50(num_classes=10)
+    model = instantiate(cfg.Network)
     module = instantiate(cfg.TrainingModule,
                          network=model)
     trainer.fit(module, datamodule=data)

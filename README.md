@@ -14,8 +14,7 @@
 
 ## Current thoughts
 - TODOS:
-    - MAKE THE FOLLOWING STRUCTURE FOR THE FOLDERS:
-        dataset_network/lightning_logs/version1/epoch_{0}
+    - Make train runs for different architectures.
     - PROVIDE A BETTER DATAMODULE FOR CIFAR10C
     - Test Magnitude Pruning on the checkpointed networks.
 
