@@ -43,7 +43,7 @@ class TestModule(pl.LightningModule):
         self.log_dict(data)
 
 
-@hydra.main(config_path="config", config_name="main")
+@hydra.main(config_path="../config", config_name="main")
 def run(cfg):
     if cfg.seed is not None:
         pl.seed_everything(cfg.seed)
