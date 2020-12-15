@@ -52,7 +52,6 @@ class CIFAR10C(ExternalDataset):
         "pixelate",
         "impulse_noise",
         "fog",
-        "labels",
         "contrast",
         "glass_blur",
         "spatter",
@@ -81,7 +80,7 @@ class CIFAR10C(ExternalDataset):
     def __getitem__(self, idx):
         img = self._images[idx]
         lbl = self._labels[idx]
-
+    
         if self.transform is not None:
             img = self.transform(img)
 

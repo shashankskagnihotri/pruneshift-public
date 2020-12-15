@@ -106,7 +106,7 @@ class CIFAR10CModule(CIFAR10Module):
         labels = ["undistorted"]
         for distortion in CIFAR10C.distortions_list:
             for lvl in range(1, 6):
-                labels.append("{}.{}".format(distortion, lvl))
+                labels.append("{}_{}".format(distortion, lvl))
         return labels
 
     def prepare_data(self):
