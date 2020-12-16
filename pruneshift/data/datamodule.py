@@ -99,13 +99,17 @@ class CIFAR10Module(BaseDataModule):
 
 class CIFAR10CModule(CIFAR10Module):
     name = "CIFAR10Corrupted"
-
+    
+    def __init__(self, root: str, batch_size: int, num_workers: int, lvls=None):
+        super(CIFAR10CModule, self).__init__(root, batch_size, num_workers)
+        self.lvls = range(1, 6) if lvls is None else lvls
+        
     @property
     def labels(self):
         """Returns labels of the datasets currently in use."""
         labels = ["undistorted"]
         for distortion in CIFAR10C.distortions_list:
-            for lvl in range(1, 6):
+            for lvl in self.lvls:
                 labels.append("{}_{}".format(distortion, lvl))
         return labels
 
@@ -123,6 +127,8 @@ class CIFAR10CModule(CIFAR10Module):
             d = CIFAR10C(
                 root=self.root, transform=self.transform(False), distortion=distortion
             )
-            datasets.extend(d.lvl_subsets())
+            d_lvls = d.lvl_subsets()
+            for lvl in self.lvls:
+                datasets.append(d_lvls[lvl - 1])
 
         self.test_dataset = datasets
