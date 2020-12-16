@@ -6,6 +6,10 @@
 | `pruneshift/` | Provides models, pruning methods and datasets |
 | `experiments/` | Lightning scripts for the experiments |
 
+## Gin vs Hydra:
+Decision we just use the simplest version of click :)
+- We want to experiment a lot instead of trying different configuration frameworks.
+
 ## Workflow
  - Work with vim and jupyter.
  - Jupyter for explorative programming and experiments.

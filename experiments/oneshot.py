@@ -1,13 +1,10 @@
-# We give another path as input.
-# We load the checkpoint.
-# We than start a new experiment run.
 import time
 import os
 from typing import Sequence
 from copy import deepcopy
 
 import hydra
-from hydra.utils import instantiate
+from hydra import instantiate
 import pandas as pd
 import pytorch_lightning as pl
 from pytorch_lightning.metrics import Accuracy 
@@ -22,6 +19,11 @@ import torchvision.models as models
 from pruneshift import datamodule
 from pruneshift import topology
 from pruneshift import simple_prune
+
+
+def list_checkpoints(chpt: ChptPath):
+    pass
+
 
 
 def load_network(chpt: ChptPath):
@@ -110,6 +112,7 @@ def prune_shift(chpt, strategy, train_data, test_data, module_map):
                            **module.test_statistics})
     return statistics
 
+
 class TestModule(pl.LightningModule):
     """Module for training models."""
     def __init__(self,
@@ -137,7 +140,6 @@ class TestModule(pl.LightningModule):
         self.log_dict(data)
 
 
-@hydra.main(config_path="../config", config_name="main")
 def run(cfg):
     if cfg.seed is not None:
         pl.seed_everything(cfg.seed)
