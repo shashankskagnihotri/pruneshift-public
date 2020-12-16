@@ -14,6 +14,9 @@
 
 ## Current thoughts
 - TODOS:
+    - Make it easier to configure things and reload stuff,
+    - Make it possible to load stuff from different angels.
+    - Log configurations.
     - Make train runs for different architectures.
     - PROVIDE A BETTER DATAMODULE FOR CIFAR10C
     - Test Magnitude Pruning on the checkpointed networks.

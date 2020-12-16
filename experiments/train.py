@@ -1,17 +1,13 @@
-import os
-
-import hydra
-from hydra.utils import instantiate
+import click
 import pytorch_lightning as pl
 from pytorch_lightning.metrics.functional import accuracy
-from pytorch_lightning import loggers as pl_loggers
 from pytorch_lightning.callbacks import ModelCheckpoint
 import torch
 import torch.nn as nn
 from torch.nn import functional as F
 import torchvision.models as models
 
-from pruneshift import datamodule
+import pruneshift
 
 
 class TrainingModule(pl.LightningModule):
@@ -48,18 +44,24 @@ class TrainingModule(pl.LightningModule):
         return torch.optim.Adam(self.parameters(), lr=self.lr)
 
 
-@hydra.main(config_name="config")
-def run(cfg):
-    if cfg.seed is not None:
-        pl.seed_everything(cfg.seed)
-
+@click.command()
+@click.argument("root", type=str, envvar="EXPERIMENT_PATH")
+@click.option("--network", type=str, default="resnet50")
+@click.option("--train-data", type=str, default="CIFAR10")
+@click.option("--num-epochs", type=int, default=300)
+@click.option("--learning-rate", type=float, default=0.0003)
+def run(root, network, train_data, num_epochs, learning_rate):
+    # if seed is not None:
+    #     pl.seed_everything(seed)
     checkpoint_callback = ModelCheckpoint(save_top_k=-1, save_weights_only=True)
-    data: pl.LightningDataModule = instantiate(cfg.DataModule)
-    trainer: pl.Trainer = instantiate(cfg.Trainer, callbacks=[checkpoint_callback])
-    network: nn.Module = instantiate(cfg.Network)
-    module = instantiate(cfg.TrainingModule, network=network)
-    trainer.fit(module, datamodule=data)
-
+    trainer = pl.Trainer(default_root_dir=root,
+                         benchmark=True,                          
+                         callbacks=[checkpoint_callback])
+    network = pruneshift.topology(network)
+    module = TrainingModule(network=network, learning_rate=0.0003)
+    datamodule = pruneshift.datamodule(train_data)
+    trainer.fit(module, datamodule=datamodule)
 
 if __name__ == "__main__":
     run()
+
