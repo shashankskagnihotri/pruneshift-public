@@ -3,15 +3,6 @@ from pathlib import Path
 
 import torch
 
-from .mobilenetv2 import *
-from .resnet import *
-from .vgg import *
-from .densenet import *
-from .resnet_orig import *
-from .googlenet import *
-from .inception import *
-
-
 # Singleton path to allow saving the models externally.
 cifar10_path = None 
 
@@ -23,4 +14,13 @@ def load_model(model, arch, device):
 
     path = cifar10_path / f"{arch}.pt"
     model.load_state_dict(torch.load(path, map_location=device))
+
+
+from .mobilenetv2 import *
+from .resnet import *
+from .vgg import *
+from .densenet import *
+from .resnet_orig import *
+from .googlenet import *
+from .inception import *
 
