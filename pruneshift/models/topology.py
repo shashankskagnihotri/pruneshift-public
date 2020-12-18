@@ -1,7 +1,10 @@
 """Provides network topologies for CIFAR10 and ImageNet."""
+import re
+
 import torch.nn as nn
 import torchvision.models as imagenet_models 
 import pruneshift.models.cifar10_models as cifar10_models
+
 
 
 def topology(name: str, pretrained=True, **kwargs):
@@ -13,8 +16,9 @@ def topology(name: str, pretrained=True, **kwargs):
 
     Returns:
         The desired network."""
+    idx = name.find("_")
+    group, name = name[ : idx], name[idx + 1: ]
 
-    group, name = name.split("_")
     if group == "cifar10":
         network_fn = getattr(cifar10_models, name)
     elif group == "imagenet":
