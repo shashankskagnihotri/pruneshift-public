@@ -48,3 +48,4 @@ Decision we just use the simplest version of click :)
 - We want to do experiments not frameworks!
 - Code is also configuration!
 - Speed matters!
+- Do not mess with gin or hydra :)

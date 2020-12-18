@@ -49,7 +49,7 @@ class TrainingModule(pl.LightningModule):
 
 
 @click.command()
-@click.argument("logpath", type=str)
+@click.option("--logpath", type=str, required=True)
 @click.option("--datapath", type=str, envvar="DATASET_PATH")
 @click.option("--network", type=str, default="resnet50")
 @click.option("--train-data", type=str, default="CIFAR10")
@@ -64,7 +64,7 @@ def run(logpath, datapath, network, train_data, gpus, epochs, learning_rate, bat
     print(f"The seed of this run is {seed}.")
     checkpoint_callback = ModelCheckpoint(period= save_every)
     trainer = pl.Trainer(
-        epochs=epochs,
+        max_epochs=epochs,
         default_root_dir=logpath,
         benchmark=True,
         callbacks=[checkpoint_callback],

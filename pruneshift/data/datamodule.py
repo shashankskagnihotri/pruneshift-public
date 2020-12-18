@@ -86,7 +86,7 @@ class CIFAR10Module(BaseDataModule):
 
     def transform(self, train: bool = True):
         transform = []
-        mean, std = (0.491, 0.482, 0.447), (0.247, 0.243, 0.262)
+        mean, std = (0.491, 0.4822, 0.4465), (0.247, 0.243, 0.262)
 
         if train:
             transform.append(transforms.RandomCrop(size=32, padding=4))
