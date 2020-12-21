@@ -1,10 +1,11 @@
+# TODO: Save the stats into a csv file, after each test run.
 import time
 import os
-from typing import Sequence
+import pathlib
+from typing import Sequence, NamedTuple
 from copy import deepcopy
 
-import hydra
-from hydra import instantiate
+import click
 import pandas as pd
 import pytorch_lightning as pl
 from pytorch_lightning.metrics import Accuracy 
@@ -18,26 +19,9 @@ import torchvision.models as models
 
 from pruneshift import datamodule
 from pruneshift import topology
-from pruneshift import simple_prune
-
-
-def list_checkpoints(chpt: ChptPath):
-    pass
-
-
-
-def load_network(chpt: ChptPath):
-    print("Recreating network for {}.".format(chpt))
-    start = time.time()
-    network = topology(chpt.model_name, num_classes=10)
-    state = torch.load(chpt.epoch_path)
-    # Remove the structure of the network 
-    conv_state = {}
-    for name in state["state_dict"]:
-        conv_state[name[8:]] = state["state_dict"][name]
-    network.load_state_dict(conv_state)
-    print("Finished recreating network in {:.1f}s.".format(time.time() - start))
-    return network
+from pruneshift.prune.utils import simple_prune
+from pruneshift import strategy
+from .cli import cli
 
 
 class TestModule(pl.LightningModule):
@@ -85,72 +69,27 @@ class TestModule(pl.LightningModule):
         self.test_statistics = {l: a.compute().item() for l, a in self.accuracy.items()}
         
 
-def prune_shift(chpt, strategy, train_data, test_data, module_map):
-    compression_ratios = [1, 2, 4, 8, 16]
-    original_network = load_network(chpt)
+@cli.command()
+@click.argument("ratios", nargs=-1, default=(1, 2, 4, 8, 16, 32))
+@click.option("--network", type=str, default="cifar10_resnet50")
+@click.option("--strategy", type=str, default="l1")
+@click.option("--train-data", type=str, default="cifar10")
+@click.option("--test-data", type=str, default="cifar10_corrupted")
+@click.option("--learning-rate", type=float, default=0.1)
+@click.option("--save-every", type=int, default=10)
+@click.pass_obj
+def oneshot(obj, **kw):
+    """ Does oneshot pruning."""
 
-    
-    early_stop_callback = EarlyStopping(
-        monitor="Validation/Accuracy")
-    trainer = pl.Trainer(callbacks=[early_stop_callback],
-                         logger=pl_loggers.CSVLogger(save_dir="/tmp/test_pruneshift"),
-                         checkpoint_callback=False,
-                         gpus=1)
-    statistics = []
+    original_network = topology(kw["network"], pretrained=True)
+    trainer = obj["trainer_factory"]()
+    train_data = obj["datamodule_factory"](kw["train_data"])
+    test_data = obj["test_module"](kw["test_data"])
 
-    for ratio in compression_ratios:
+    for ratio in kw["ratio"]:
         network = deepcopy(original_network)
-        # Prune the network
-        simple_prune(network, strategy, module_map=module_map, amount=1 - 1 / ratio)
+        simple_prune(network, strategy, amount=1 - 1 / ratio)
         module = TestModule(network, test_data.labels)
         trainer.fit(module, datamodule=train_data)
         trainer.test(module, datamodule=test_data)
-        statistics.append({"network": chpt.model_name,
-                           "dataset": chpt.datamodule_name,
-                           "epoch": chpt.epoch + 1,
-                           "ratio": ratio,
-                           **module.test_statistics})
-    return statistics
 
-
-class TestModule(pl.LightningModule):
-    """Module for training models."""
-    def __init__(self,
-                 network: nn.Module,
-                 labels: Sequence[str]):
-        super(TestModule, self).__init__()
-        self.network = network
-        self.labels = labels
-
-    def forward(self, x):
-        return self.network(x)
-
-    def test_step(self, batch, batch_idx, dataset_idx):
-        x, y = batch
-        return y, torch.argmax(self(x), 1)
-
-    def test_epoch_end(self, outputs):
-        data = {}
-        for label, dataset_outputs in zip(label, outputs):
-            acc = Accuracy()
-            for y, y_pred in dataset_outputs:
-                acc(y, y_pred)
-            # output dataloader_outputs are list of tuples.
-            data[label] = acc.compute()
-        self.log_dict(data)
-
-
-def run(cfg):
-    if cfg.seed is not None:
-        pl.seed_everything(cfg.seed)
-
-    checkpoint_callback = ModelCheckpoint(save_top_k=-1, save_weights_only=True)
-    data: pl.LightningDataModule = instantiate(cfg.DataModule)
-    trainer: pl.Trainer = instantiate(cfg.Trainer, callbacks=[checkpoint_callback])
-    network: nn.Module = instantiate(cfg.Network)
-    module = instantiate(cfg.TrainingModule, network=network, labels=data.labels)
-    trainer.test(module, datamodule=data)
-
-
-if __name__ == "__main__":
-    run()

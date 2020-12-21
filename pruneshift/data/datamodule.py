@@ -13,7 +13,7 @@ from .datasets import CIFAR10C
 def datamodule(
     name: str, root: str, batch_size: int = 32, num_workers: int = 5, **kwargs
 ) -> pl.LightningDataModule:
-    """Creates a LightningDataModule.
+    """ Creates a LightningDataModule.
 
     Args:
         name: Name of the dataset/datamodule.
@@ -68,7 +68,7 @@ class BaseDataModule(pl.LightningDataModule):
 
 
 class CIFAR10Module(BaseDataModule):
-    name = "CIFAR10"
+    name = "cifar10"
 
     def prepare_data(self):
         torch_datasets.CIFAR10(self.root, train=True, download=True)
@@ -98,7 +98,7 @@ class CIFAR10Module(BaseDataModule):
 
 
 class CIFAR10CModule(CIFAR10Module):
-    name = "CIFAR10Corrupted"
+    name = "cifar10_corrupted"
     
     def __init__(self, root: str, batch_size: int, num_workers: int, lvls=None):
         super(CIFAR10CModule, self).__init__(root, batch_size, num_workers)
