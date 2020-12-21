@@ -18,6 +18,10 @@ A good package for imagenet models can be found here, unfortunately there is no 
 
 ## Current thoughts
 - TODOS:
+    - Imitate the project structure of click:
+        - Move everything into src
+        - Create a config file.
+        - Make the package structure flat.
     - Log configurations as hyparameters with the lightning module.
     - Implement Oneshot, Rewind, Hydra and one additional state of the art.
     - Add augmix to learn from.

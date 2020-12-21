@@ -7,7 +7,7 @@ import torch.nn as nn
 from pruneshift.prune.utils import simple_prune
 
 
-def strategy(name: str) -> Type[RegisteredPruningMethod]:
+def strategy(name: str) -> Type["RegisteredPruningMethod"]:
     """ Returns a RegisteredPruningMethod class."""
 
     return RegisteredPruningMethod.subclasses[name]
