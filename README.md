@@ -19,11 +19,21 @@ A good package for imagenet models can be found here, unfortunately there is no 
 ## Current thoughts
 - TODOS:
     - Imitate the project structure of click:
-        - Move everything into src
-        - Create a config file.
-        - Make the package structure flat.
-    - Log configurations as hyparameters with the lightning module.
+        - MOVE EVERYTHING INTO SRC
+        - CREATE A CONFIG FILE.
+        - MAKE THE CLI TO ONE FILE ONLY AND MOVE IT INTO PRUNESHIFT.
+        - Export the oneshot function call and stuff like this into a run file.
+        - MAKE THE PACKAGE STRUCTURE FLAT.
+        - INTRODUCE ANOTHER SRC FOR CIFAR10_MODELS.
+        - FIND OUT WHEN THE LIGHTNING LOGGER IS INITIALIZED.
+        - LOG HYPARAMETERS WITH THE LIGHTNING MODULE.
+        - Check whether the CSV logger does work right.
+        - Introduce subfolder structure depending on the command.
+        - Set experiment names.
+        
     - Implement Oneshot, Rewind, Hydra and one additional state of the art.
+        - Oneshot:
+            pass
     - Add augmix to learn from.
 
 

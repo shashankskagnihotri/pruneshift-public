@@ -1,8 +1,5 @@
 """ Provides the data modules we need for our experiments."""
-import abc
-from typing import Sequence
-
-from torch.utils.data import DataLoader, random_split, Dataset
+from torch.utils.data import DataLoader, random_split
 import torchvision.datasets as torch_datasets
 from torchvision import transforms
 import pytorch_lightning as pl
@@ -60,11 +57,16 @@ class BaseDataModule(pl.LightningDataModule):
     def train_dataloader(self):
         return self._create_dataloader(self.train_dataset)
 
+    def _create_plenty(self, dataset):
+        if not isinstance(dataset, (tuple, list)):
+            return self._create_dataloader([dataset])
+        return self._create_dataloader(dataset)
+
     def val_dataloader(self):
-        return self._create_dataloader(self.val_dataset)
+        return self._create_plenty(self.val_dataset)
 
     def test_dataloader(self):
-        return self._create_dataloader(self.test_dataset)
+        return self._create_plenty(self.test_dataset)
 
 
 class CIFAR10Module(BaseDataModule):
@@ -97,17 +99,18 @@ class CIFAR10Module(BaseDataModule):
         return transforms.Compose(transform)
 
 
+# TODO: Add a string registration method, such that we can select different amount of lvls.
 class CIFAR10CModule(CIFAR10Module):
     name = "cifar10_corrupted"
-    
-    def __init__(self, root: str, batch_size: int, num_workers: int, lvls=None):
+ 
+    def __init__(self, root: str, batch_size: int, num_workers: int, lvls=5):
         super(CIFAR10CModule, self).__init__(root, batch_size, num_workers)
         self.lvls = range(1, 6) if lvls is None else lvls
         
     @property
     def labels(self):
         """Returns labels of the datasets currently in use."""
-        labels = ["undistorted"]
+        labels = [""]
         for distortion in CIFAR10C.distortions_list:
             for lvl in self.lvls:
                 labels.append("{}_{}".format(distortion, lvl))
@@ -132,3 +135,4 @@ class CIFAR10CModule(CIFAR10Module):
                 datasets.append(d_lvls[lvl - 1])
 
         self.test_dataset = datasets
+

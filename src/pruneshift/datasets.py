@@ -1,7 +1,4 @@
 import os
-import glob
-from urllib.request import urlopen
-from pathlib import Path
 
 import numpy as np
 import torch

@@ -1,3 +1,3 @@
-from .data.datamodule import datamodule
-from .models.topology import topology
-from .prune.strategies import strategy
+from .datamodules import datamodule
+from .topologies import network_topology
+from .prune import prune_strategy
