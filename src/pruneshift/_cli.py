@@ -77,7 +77,6 @@ def oneshot(obj, **kw):
     trainer = obj["trainer_factory"]("oneshot")
     train_data = obj["datamodule_factory"](kw["train_data"])
     test_data = obj["datamodule_factory"](kw["test_data"])
-    print(test_data.labels)
 
     for ratio in kw["ratios"]:
         network = deepcopy(original_network)

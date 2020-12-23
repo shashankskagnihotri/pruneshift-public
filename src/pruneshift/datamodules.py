@@ -11,7 +11,6 @@ def datamodule(
     name: str, root: str, batch_size: int = 32, num_workers: int = 5, **kwargs
 ) -> pl.LightningDataModule:
     """ Creates a LightningDataModule.
-
     Args:
         name: Name of the dataset/datamodule.
         root: Where to download the data if necessary.
@@ -46,11 +45,6 @@ class BaseDataModule(pl.LightningDataModule):
             pin_memory=True,
         )
 
-    def __init_subclass__(cls, **kwargs):
-        # Add subclasses to the module.
-        super().__init_subclass__(**kwargs)
-        cls.subclasses[cls.name] = cls
-
     def transform(self, train: bool = False):
         return transforms.ToTensor()
 
@@ -70,8 +64,6 @@ class BaseDataModule(pl.LightningDataModule):
 
 
 class CIFAR10Module(BaseDataModule):
-    name = "cifar10"
-
     def prepare_data(self):
         torch_datasets.CIFAR10(self.root, train=True, download=True)
         torch_datasets.CIFAR10(self.root, train=False, download=True)
@@ -99,10 +91,7 @@ class CIFAR10Module(BaseDataModule):
         return transforms.Compose(transform)
 
 
-# TODO: Add a string registration method, such that we can select different amount of lvls.
 class CIFAR10CModule(CIFAR10Module):
-    name = "cifar10_corrupted"
- 
     def __init__(self, root: str, batch_size: int, num_workers: int, lvls=5):
         super(CIFAR10CModule, self).__init__(root, batch_size, num_workers)
         self.lvls = range(1, 6) if lvls is None else lvls
