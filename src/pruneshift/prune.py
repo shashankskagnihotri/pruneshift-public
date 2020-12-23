@@ -4,35 +4,23 @@ import logging
 import torch
 from torch import nn as nn
 from torch.nn.utils import prune as prune
+import gin
 
 
 logger = logging.getLogger(__name__)
 BASIC_MODULE_MAP = {nn.Linear: ["weight"], nn.Conv2d: ["weight"]}
 
 
-def prune_strategy(name: str) -> Type["RegisteredPruningMethod"]:
-    """ Returns a RegisteredPruningMethod class."""
-    return RegisteredPruningMethod.subclasses[name]
+L1Unstructured = gin.external_configurable(prune.L1Unstructured)
+
+# @gin.configurable
+# class L1Unstructured(prune.BasePruningMethod):
+#     def compute_mask(self, t, default_mask):
+#         return super(L1Unstructured, self).compute_mask(t.grad, default_mask)
 
 
-class RegisteredPruningMethod(prune.BasePruningMethod):
-    subclasses = {}
-    name = None
-
-    def compute_mask(self, t, default_mask):
-        raise NotImplementedError
-
-    def __init_subclass__(cls, **kwargs):
-        # Add subclasses to the module.
-        super().__init_subclass__(**kwargs)
-        cls.subclasses[cls.name] = cls
-
-
-class AbsoluteMethod(prune.L1Unstructured, RegisteredPruningMethod):
-    name = "l1"
-
-
-class AbsoluteGradMethod(RegisteredPruningMethod):
+@gin.configurable
+class L1GradUnstructered(prune.BasePruningMethod):
     """
     Examples:
         >>> net = nn.Sequential(nn.Linear(1, 4),
@@ -40,12 +28,11 @@ class AbsoluteGradMethod(RegisteredPruningMethod):
         >>> net(torch.tensor([2.])).backward()
         >>> simple_prune(net, AbsoluteGradMethod, amount=2)
     """
-    name = "l1grad"
-
     def compute_mask(self, t, default_mask):
-        return super(AbsoluteGradMethod, self).compute_mask(t.grad, default_mask)
+        return super(L1GradUnstructered, self).compute_mask(t.grad, default_mask)
 
 
+@gin.configurable
 def simple_prune(
     module: nn.Module,
     pruning_method: Type[prune.BasePruningMethod],
@@ -60,12 +47,10 @@ def simple_prune(
         >>> simple_prune(net, prune.L1Unstructured, amount=2)
         >>> simple_prune(net, prune.L1Unstructured, layerwise=True, amount=1)
     """
-    # logger.info(f"Prune module with {pruning_method}.")
     if module_map is None:
         module_map = BASIC_MODULE_MAP
 
     pairs = [(m, p) for m in module.modules() for p in module_map.get(type(m), [])]
-    # logger.info(f"Will prune the following pairs:\n {pairs}")
 
     if not layerwise:
         prune.global_unstructured(pairs, pruning_method, **kwargs)
@@ -73,3 +58,4 @@ def simple_prune(
 
     for m, p in pairs:
         pruning_method.apply(m, p, **kwargs)
+

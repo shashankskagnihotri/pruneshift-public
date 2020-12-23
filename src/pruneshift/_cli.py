@@ -2,92 +2,110 @@ from functools import partial
 from copy import deepcopy
 import random
 import logging
+from pathlib import Path
 
 import pytorch_lightning as pl
-# from pytorch_lightning.callbacks import ModelCheckpoint
+from pytorch_lightning.callbacks import ModelCheckpoint
+from pytorch_lightning.callbacks import EarlyStopping
 from pytorch_lightning.loggers import TensorBoardLogger
 from pytorch_lightning.loggers import CSVLogger
 import click
+import gin
+import gin.torch
 
-from . import datamodule
-from . import network_topology
-from . import prune_strategy
-from .prune import simple_prune
+from .datamodules import datamodule
+from .topologies import network_topology
 from .modules import VisionModule
+from .prune import simple_prune
 
 
 logging.basicConfig(level=logging.DEBUG)
 
 
-def trainer_factory(epochs, gpus, logdir, **out):
-    def create_fn(experiment_name, **kw):
-        # Tensorboard logger saves at the same location as the weights are saved.
-        # We want to use tensorboard only for monitoring progress.
-        tb_logger = TensorBoardLogger(logdir, name=experiment_name)
-        # CSVLogger logs into the resultdir which is part of the repository and is
-        # used to visualize results.
-        csv_logger = CSVLogger(logdir, name=experiment_name)
-        logger = [tb_logger, csv_logger]
+# Register the important sutff from gin-stuff.
+GinTrainer = gin.external_configurable(pl.Trainer)
+GinEarlyStopping = gin.external_configurable(EarlyStopping)
+GinModelCheckpoint = gin.external_configurable(ModelCheckpoint)
 
-        return pl.Trainer(logger=logger,
-                          benchmark=True,
-                          gpus=gpus,
-                          max_epochs=epochs,
-                          default_root_dir=logdir,
-                          **kw)
-    return create_fn
+
+@gin.configurable
+def create_trainer(
+    logdir: str,
+    seed: int = None,
+    early_stopping: bool = False,
+    custom_checkpointing: bool = False,
+):
+    path = Path(logdir)
+    callbacks = []
+    # Creating a tensorboard and csv logger.
+    tb_logger = TensorBoardLogger(path, name="tensorboard")
+    csv_logger = CSVLogger(path, name="csv")
+    logger = [tb_logger, csv_logger]
+    # Introduce early_stopping
+    if early_stopping:
+        callbacks.append(GinEarlyStopping("val_acc"))
+    # If wanted allow custom checkpointing.
+    if custom_checkpointing:
+        print("Using custom checkpointing!")
+        callbacks.append(GinModelCheckpoint(monitor="val_acc"))
+
+    if seed is None:
+        deterministic = False
+    else:
+        print(f"Setting the seed to {seed}")
+        pl.seed_everything(seed)
+        deterministic = True
+
+    return GinTrainer(logger=logger, deterministic=deterministic)
+
+
+def create_hparams(bindings, **kw):
+    for name, binding in bindings.items():
+        kw[name] = gin.query_parameter(binding)
+    return kw 
 
 
 @click.group()
-@click.option("--epochs", type=int, default=200)
-@click.option("--gpus", type=int, default=1)
+@click.argument("config-name", type=str)
+@click.option("--gin-binding", "-b", type=str, multiple=True)
 @click.option("--logdir", type=str, envvar="EXPERIMENT_PATH")
 @click.option("--datadir", type=str, envvar="DATASET_PATH")
-@click.option("--batch-size", type=int, default=128)
-@click.option("--seed", type=int, default=-1)
-@click.option("--num-workers", type=int, default=5)
 @click.pass_context
-def cli(ctx, **kw):
+def cli(ctx, config_name, gin_binding, logdir, datadir):
     """Entry point for running pruneshift scripts."""
+    config_path = Path(__file__).parent.parent.parent / "configs" / config_name
     ctx.ensure_object(dict)
-
-    # Seed everything.
-    if kw["seed"] == -1:
-        kw["seed"] = random.randint(0, 10000)
-    pl.seed_everything(kw["seed"])
-
-    ctx.obj["trainer_factory"] = trainer_factory(**kw)
-    ctx.obj["datamodule_factory"] = partial(datamodule, root=kw["datadir"], batch_size=kw["batch_size"], num_workers=kw["num_workers"])
-    ctx.obj["hparams_dict"] = {k: kw[k] for k in ["epochs", "batch_size"]}
+    ctx.obj["logdir"] = logdir
+    ctx.obj["datadir"] = datadir
+    ctx.obj["config_name"] = config_name
+    gin.parse_config_files_and_bindings([config_path], gin_binding)
 
 
 @cli.command()
 @click.argument("ratios", type=int, nargs=-1)
-@click.option("--network", type=str, default="cifar10_resnet50")
-@click.option("--strategy", type=str, default="l1")
-@click.option("--train-data", type=str, default="cifar10")
-@click.option("--test-data", type=str, default="cifar10_corrupted")
-@click.option("--learning-rate", type=float, default=0.1)
-@click.option("--save-every", type=int, default=10)
 @click.pass_obj
-def oneshot(obj, **kw):
+def oneshot(obj, ratios):
     """ Does oneshot pruning."""
 
-    original_network = network_topology(kw["network"], pretrained=True)
-    trainer = obj["trainer_factory"]("oneshot")
-    train_data = obj["datamodule_factory"](kw["train_data"])
-    test_data = obj["datamodule_factory"](kw["test_data"])
+    original_network = network_topology(pretrained=True)
+    data = datamodule(root=obj["datadir"])
 
-    for ratio in kw["ratios"]:
+    for ratio in ratios:
+        trainer = create_trainer(obj["logdir"])
         network = deepcopy(original_network)
-        simple_prune(network, prune_strategy(kw["strategy"]), amount=1 - 1 / ratio)
-        module = VisionModule(network, test_data.labels)
-        trainer.fit(module, datamodule=train_data)
-        trainer.test(module, datamodule=test_data)
-
+        simple_prune(network, amount=1 - 1 / ratio)
+        hparams = create_hparams(
+            {"network": "network_topology.name", "datamodule": "datamodule.name"},
+            config_name=obj["config_name"],
+            ratio=ratio,
+        )
+        module = VisionModule(network, hparams=hparams)
+        trainer.fit(module, datamodule=data)
+        trainer.test(module, datamodule=data)
 
 @cli.command()
-@click.pass_obj
-def rewind(obj, **kw):
-    """ Introduces rewind."""
-    print("Hey ho")
+def dummy():
+    pass
+
+if __name__ == "__main__":
+    cli({})

@@ -3,10 +3,12 @@ from torch.utils.data import DataLoader, random_split
 import torchvision.datasets as torch_datasets
 from torchvision import transforms
 import pytorch_lightning as pl
+import gin
 
 from .datasets import CIFAR10C
 
 
+@gin.configurable
 def datamodule(
     name: str, root: str, batch_size: int = 32, num_workers: int = 5, **kwargs
 ) -> pl.LightningDataModule:
@@ -33,6 +35,11 @@ class BaseDataModule(pl.LightningDataModule):
         self.train_dataset = None
         self.val_dataset = None
         self.test_dataset = None
+
+    def __init_subclass__(cls, **kwargs):
+        # Add subclasses to the module.
+        super().__init_subclass__(**kwargs)
+        cls.subclasses[cls.name] = cls
 
     def _create_dataloader(self, dataset):
         if isinstance(dataset, (tuple, list)):
@@ -64,19 +71,23 @@ class BaseDataModule(pl.LightningDataModule):
 
 
 class CIFAR10Module(BaseDataModule):
+    name = "cifar10"
+
     def prepare_data(self):
         torch_datasets.CIFAR10(self.root, train=True, download=True)
         torch_datasets.CIFAR10(self.root, train=False, download=True)
 
-    def setup(self, stage: str) -> None:
+    def setup(self, stage: str = None) -> None:
         create_fn = torch_datasets.CIFAR10
-        self.test_dataset = create_fn(self.root, False,
-                                      transform=self.transform(False))
-
-        trainset = create_fn(self.root, True, transform=self.transform())
-        trainset, valset = random_split(trainset, [45000, 5000])
-        self.train_dataset = trainset
-        self.val_dataset = valset
+        
+        if stage == "test" or stage is None:
+            self.test_dataset = create_fn(self.root, False,
+                                          transform=self.transform(False))
+        if stage == "fit" or stage is None:
+            trainset = create_fn(self.root, True, transform=self.transform())
+            trainset, valset = random_split(trainset, [45000, 5000])
+            self.train_dataset = trainset
+            self.val_dataset = valset
 
     def transform(self, train: bool = True):
         transform = []
@@ -92,14 +103,16 @@ class CIFAR10Module(BaseDataModule):
 
 
 class CIFAR10CModule(CIFAR10Module):
-    def __init__(self, root: str, batch_size: int, num_workers: int, lvls=5):
+    name = "cifar10_corrupted"
+
+    def __init__(self, root: str, batch_size: int, num_workers: int, lvls=None):
         super(CIFAR10CModule, self).__init__(root, batch_size, num_workers)
         self.lvls = range(1, 6) if lvls is None else lvls
         
     @property
     def labels(self):
         """Returns labels of the datasets currently in use."""
-        labels = [""]
+        labels = ["original"]
         for distortion in CIFAR10C.distortions_list:
             for lvl in self.lvls:
                 labels.append("{}_{}".format(distortion, lvl))
@@ -110,8 +123,8 @@ class CIFAR10CModule(CIFAR10Module):
         torch_datasets.CIFAR10(self.root, train=False, download=True)
         CIFAR10C(self.root, "snow")
 
-    def setup(self, stage):
-        # Add the benign set.
+
+    def setup(self, stage: str = None):
         datasets = [torch_datasets.CIFAR10(self.root, False, self.transform(False))]
 
         # Add the evil sets.

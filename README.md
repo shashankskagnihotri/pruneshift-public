@@ -18,8 +18,14 @@ A good package for imagenet models can be found here, unfortunately there is no 
 
 ## Current thoughts
 - TODOS:
+    - Reintroduce gin-config:
+        - Most of the time we try to write factory code, and parsing the correct
+            configurations is very very messy:
+            eg we wanted to specifically configure some setting and its not that great.
+        - This will also allow us to have a huge flexibility regarding creating datamodules.
+        - Hydra is too fancy for us.
     - Finish folder structure:
-        - 
+        - Save everything in a specific folder.
     - Implement Oneshot, Rewind, Hydra and one additional state of the art.
         - Oneshot:
             pass
@@ -30,4 +36,4 @@ A good package for imagenet models can be found here, unfortunately there is no 
 - We want to do experiments not frameworks!
 - Code is also configuration! Thus, click is better than hydra.
 - Speed matters!
-- Do not mess with gin or hydra :)
+- Do not mess with gin or hydra :) But hydra was better in the end!

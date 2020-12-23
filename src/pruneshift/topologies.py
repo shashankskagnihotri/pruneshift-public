@@ -1,8 +1,10 @@
 """Provides network topologies for CIFAR10 and ImageNet."""
 import torchvision.models as imagenet_models
 import cifar10_models
+import gin
 
 
+@gin.configurable
 def network_topology(name: str, pretrained=True, **kwargs):
     """A function creating common networks for either CIFAR10 and ImageNet
 
