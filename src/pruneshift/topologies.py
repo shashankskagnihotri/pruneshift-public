@@ -25,3 +25,4 @@ def network_topology(name: str, pretrained=True, **kwargs):
         raise ValueError(f"Unknown group {group}.")
   
     return network_fn(pretrained=pretrained, **kwargs)
+
