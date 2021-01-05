@@ -64,7 +64,7 @@ def prune(info: PruneInfo, method: str, ratio: float):
     
     amount = prune_info.ratio_to_amount(ratio)
     simple_prune(prune_info, pruning_cls, layerwise, amount=amount)
-
+ 
 
 def simple_prune(
     prune_info: PruneInfo,
