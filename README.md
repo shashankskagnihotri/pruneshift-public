@@ -19,6 +19,12 @@ A good package for imagenet models can be found here, unfortunately there is no 
 We leave out gradient based methods as they are hard to work with.
 
 ## TODOS:
+    - Look into shrinkbench.
+        - We should not prune the readout layer.
+        - They use the original resnet variant from the paper, which is a variant without batchnorm.
+        - They calculate the pruning ratio regarding all learnable parameters: eg They take into account the batchnorm layers and readout layers.
+        - How can we integrate this into our own code base?
+        - They also prune only conv and linear layers.
     - Implement evaluate. 2h
     - Implement rewind. 2h
     - Integrate structured pruning. 2h
