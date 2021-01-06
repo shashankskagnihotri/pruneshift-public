@@ -35,17 +35,14 @@ def param_size(
     as_bits: bool = False,
 ):
     """ Calculates the size of a parameter in a module."""
-    if param_name[-5:] == "_orig" or param_name[-5:] == "_mask":
-        return 0
-
     param = getattr(module, param_name)
     factor = DTYPE2BITS[param.dtype] if as_bits else 1
 
-    if hasattr(module, param_name + "_mask") and not original:
-        mask = getattr(module, param_name + "_mask")
-        return factor * mask.sum().item()
+    if param_name[-5:] == "_orig" and not original:
+        mask = getattr(module, param_name[:-5] + "_mask")
+        return int(factor * mask.sum().item())
 
-    return factor * param.numel()
+    return int(factor * param.numel())
 
 
 DEFAULT_TARGETS = {nn.Linear: ["weight", "bias"], nn.Conv2d: ["weight", "bias"]}
@@ -56,22 +53,20 @@ class PruneInfo:
         self.network = network
         self.target_map = DEFAULT_TARGETS if target_map is None else target_map
 
-    def protected(self) -> Iterator[nn.Module]:
+    def is_protected(self, module: nn.Module) -> bool:
         """ Iterates over the protected modules of the network."""
-        for module in self.network.modules():
-            if not hasattr(module, "is_protected"):
-                continue
-            if module.is_protected:
-                yield module
+        return getattr(module, "is_protected", False)
 
     def is_target(self, module: nn.Module, param_name: str):
         """ Returns whether a module param pair is a target for pruning."""
-        return param_name in self.target_map[type(module)]
+        if param_name[-5:] == "_orig":
+            param_name = param_name[:-5]
+        return param_name in self.target_map.get(type(module), [])
 
     def _iter_pairs(self, complete=False):
         """ Iterates over all module, param pairs."""
         for module_name, module in self.network.named_modules():
-            for param, param_name in module.named_parameters():
+            for param_name, param in module.named_parameters(recurse=False):
                 if complete:
                     yield module_name, module, param_name, param
                 else:
@@ -79,9 +74,8 @@ class PruneInfo:
 
     def target_pairs(self):
         """ Returns the module parameter pairs that are marked for pruning."""
-        protected = set(self.protected)
         for module, param_name in self._iter_pairs():
-            if module in protected:
+            if self.is_protected(module):
                 continue
             if self.is_target(module, param_name):
                 yield module, param_name
@@ -90,25 +84,28 @@ class PruneInfo:
         """ Converts the ratio into the amount to prune.
 
         Takes into account that the wrapped network might be already pruned."""
+        assert ratio >= 1
         curr_size = self.network_size()
         curr_target_size = self.target_size()
         amount = (1 - 1 / ratio) * curr_size / curr_target_size
-        if amount > 1:
+        if amount > 1.00000001:  # There must be a better way.
             msg = (
-                f"Compression ratio {ratio} can not be achieved, as the"
-                 "percentage of prunable modules is too low."
+                f"Compression ratio {ratio} can not be achieved, as the "
+                 "percentage of prunable parameters is too low."
             )
-            raise RuntimeError(msg)
+            raise ValueError(msg)
         return amount
 
     def network_size(self, original: bool = False, as_bits: bool = False) -> int:
         """ The size of the network."""
-        return sum([param_size(m, pn, original, as_bits) for m, pn in self._iter_pairs])
+        return sum(
+            [param_size(m, pn, original, as_bits) for m, pn in self._iter_pairs()]
+        )
 
     def target_size(self, original: bool = False, as_bits: bool = False) -> int:
         """ The size of all target modules."""
         return sum(
-            [param_size(m, pn, original, as_bits) for m, pn in self.target_pairs]
+            [param_size(m, pn, original, as_bits) for m, pn in self.target_pairs()]
         )
 
     def network_comp(self):
@@ -143,4 +140,3 @@ class PruneInfo:
             )
         columns = ["module", "param", "comp", "size", "shape", "target"]
         return pd.DataFrame(rows, columns=columns)
-
