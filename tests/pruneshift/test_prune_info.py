@@ -1,29 +1,5 @@
 import pytest
-import torch.nn as nn
 import torch.nn.utils.prune as prune
-
-from pruneshift.prune_info import PruneInfo
-
-
-class DummyNet(nn.Module):
-    def __init__(self):
-        super(DummyNet, self).__init__()
-        self.conv1 = nn.Conv2d(2, 2, 1, bias=False)
-        self.conv2 = nn.Conv2d(2, 2, 1)
-
-        self.batch = nn.BatchNorm2d(2)
-        self.linear = nn.Linear(2, 2)
-        self.linear.is_protected = True
-
-
-@pytest.fixture
-def dummy_net():
-    return DummyNet()
-
-
-@pytest.fixture
-def prune_info(dummy_net):
-    return PruneInfo(dummy_net)
 
 
 class TestPruneInfo:
@@ -77,3 +53,7 @@ class TestPruneInfo:
         prune.l1_unstructured(dummy_net.conv1, "weight", 2)
         prune.l1_unstructured(dummy_net.conv2, "weight", 3)
         assert pytest.approx(prune_info.ratio_to_amount(1.5), 0.000001) == 1.
+
+    def test_summary(self, dummy_net, prune_info):
+        prune.l1_unstructured(dummy_net.conv2, "weight", 3)
+        print(prune_info.summary())

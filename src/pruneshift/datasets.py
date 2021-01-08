@@ -86,3 +86,10 @@ class CIFAR10C(ExternalDataset):
     def __len__(self):
         return 50000 
 
+
+class ImageNetC(CIFAR10C):
+    dir_name = "ImageNet-C"
+    url = "https://zenodo.org/record/2535967/files/CIFAR-10-C.tar"
+
+    def __len__(self):
+        return 2

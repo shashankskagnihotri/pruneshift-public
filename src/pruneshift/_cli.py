@@ -9,6 +9,7 @@ The experiments build the following structure:
         config.gin
 
 """
+import os
 from typing import Type
 from functools import partial
 from copy import deepcopy
@@ -99,13 +100,22 @@ def create_hparams(bindings, **kw):
 @click.group()
 @click.argument("config-file", type=str)
 @click.option("--gin-binding", "-b", type=str, multiple=True)
-@click.option("--logdir", type=str, envvar="EXPERIMENT_PATH")
+@click.option("--logdir", type=str, default=None)
 @click.option("--datadir", type=str, envvar="DATASET_PATH")
 @click.pass_context
 def cli(ctx, config_file, gin_binding, logdir, datadir):
     """Entry point for running pruneshift scripts."""
     ctx.ensure_object(dict)
+    # If logdir was not set, we look for the envvar EXPERIMENT_PATH and
+    # introduce a version dir mechanism.
+    if logdir is None:
+        logdir = Path(os.environ["EXPERIMENT_PATH"])
+        versions = [int(str(vp.stem).split("_")[-1])
+                    for vp in logdir.glob("version_*")]
+        new_vers = max(versions) + 1 if versions else 0
+        logdir = logdir/("version_" + str(new_vers))
     Path(logdir).mkdir(parents=True, exist_ok=True)
+
     ctx.obj["logdir"] = logdir
     ctx.obj["datadir"] = datadir
 
@@ -123,10 +133,9 @@ def cli(ctx, config_file, gin_binding, logdir, datadir):
 @click.pass_obj
 def oneshot(obj, pruning_method, ratio):
     """ Does oneshot pruning."""
-    original_network = network_topology(pretrained=True)
+    network = network_topology(pretrained=True)
     data = datamodule(root=obj["datadir"])
     trainer = create_trainer(obj["logdir"])
-    network = deepcopy(original_network)
     hparams = create_hparams({"network": "network_topology.name", "datamodule": "datamodule.name"},
             ratio=ratio, pruning_method=pruning_method,
         )

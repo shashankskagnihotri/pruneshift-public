@@ -19,16 +19,12 @@ A good package for imagenet models can be found here, unfortunately there is no 
 We leave out gradient based methods as they are hard to work with.
 
 ## TODOS:
-- Test pruneinfo.
-- Implement evaluate. 2h
+- Saturday: Is runner day, we implement rewind, evaluate at the end of a run.
+- Sunday: Is dataset day, we integrate augmix, Imagenette and ImageNetC.
 - Implement rewind. 2h
 - Integrate structured pruning. 2h
-    - Here we should read a little bit about structured pruning.
-- Integrate augmix. 1h
-- Visualize where weights are pruned.
 
-## Next Meeting:
-    - Pruning or strutctured pruning?
+
 
 ## Questions
 1. Is ood generalization degrading more when using pruning? Missing method to read data out.

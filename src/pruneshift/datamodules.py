@@ -37,7 +37,7 @@ class BaseDataModule(pl.LightningDataModule):
         self.test_dataset = None
 
     def __init_subclass__(cls, **kwargs):
-        # Add subclasses to the module.
+        # Adds subclasses to the module.
         super().__init_subclass__(**kwargs)
         cls.subclasses[cls.name] = cls
 
@@ -123,18 +123,60 @@ class CIFAR10CModule(CIFAR10Module):
         torch_datasets.CIFAR10(self.root, train=False, download=True)
         CIFAR10C(self.root, "snow")
 
-
     def setup(self, stage: str = None):
-        datasets = [torch_datasets.CIFAR10(self.root, False, self.transform(False))]
+        create_fn = torch_datasets.CIFAR10
 
-        # Add the evil sets.
-        for distortion in CIFAR10C.distortions_list:
-            d = CIFAR10C(
-                root=self.root, transform=self.transform(False), distortion=distortion
-            )
-            d_lvls = d.lvl_subsets()
-            for lvl in self.lvls:
-                datasets.append(d_lvls[lvl - 1])
+        if stage == "test" or stage is None:
+            self.test_dataset = create_fn(self.root, False,
+                                          transform=self.transform(False))
+        if stage == "fit" or stage is None:
+            trainset = create_fn(self.root, True, transform=self.transform())
+            trainset, valset = random_split(trainset, [45000, 5000])
+            self.train_dataset = trainset
+            self.val_dataset = valset
 
-        self.test_dataset = datasets
 
+class ImageNetModule(BaseDataModule):
+    name = "imagenet"
+
+    def prepare_data(self):
+        torch_datasets.ImageNet()
+
+    def transform(self, train: bool = True):
+        transform = []
+        mean, std = (0.485, 0.456, 0.406), (0.229, 0.224, 0.225)
+
+        if train:
+            transform.append(transforms.RandomResizedCrop(224))
+            transform.append(transforms.RandomHorizontalFlip())
+        transform.append(transforms.ToTensor())
+        transform.append(transforms.Normalize(mean, std))
+
+        return transform
+
+    def setup(self, stage: str = None) -> None:
+        create_fn = torch_datasets.ImageNet
+
+        if stage == "test" or stage is None:
+            self.test_dataset = create_fn(self.root, False,
+                                          transform=self.transform(False))
+        if stage == "fit" or stage is None:
+            trainset = create_fn(self.root, True, transform=self.transform())
+            trainset, valset = random_split(trainset, [45000, 5000])
+            self.train_dataset = trainset
+            self.val_dataset = valset
+
+
+class ImageNetCModule(ImageNetModule):
+    name = "imagenet_corrupted"
+    pass
+
+
+class TinyImageNetModule(BaseDataModule):
+    name = "tiny_imagenet"
+    pass
+
+
+class TinyImageNetCModule(TinyImageNetModule):
+    name = "tiny_imagenet_corrupted"
+    pass

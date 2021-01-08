@@ -125,7 +125,9 @@ class PruneInfo:
                 continue
             curr_size = param_size(module, param_name)
 
-            # TODO: What happens when curr_size = 0.
+            if param_name[-5: ] == "_orig":
+                param_name = param_name[:-5]
+
             comp = orig_size / curr_size
             shape = tuple(param.shape)
             rows.append(
@@ -133,10 +135,12 @@ class PruneInfo:
                     module_name,
                     param_name,
                     comp,
+                    1 - 1 / comp,
                     orig_size,
                     shape,
                     self.is_target(module, param_name),
+                    self.is_protected(module)
                 ]
             )
-        columns = ["module", "param", "comp", "size", "shape", "target"]
+        columns = ["module", "param", "comp", "amount", "size", "shape", "target", "protected"]
         return pd.DataFrame(rows, columns=columns)

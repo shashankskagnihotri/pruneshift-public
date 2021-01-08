@@ -25,13 +25,13 @@ class L1GradUnstructered(prune_torch.L1Unstructured):
 
 
 @gin.configurable
-def prune(info: PruneInfo, method: str, ratio: float):
+def prune(network: nn.Module, method: str, ratio: float):
     """Prunes a network inplace.
 
     Note that some networks require having loaded a gradient already.
 
     Args:
-        info: Information about the network and its prunable parameters.
+        network: The network to prune.
         method: The name of the pruning method.
 
     Returns:
@@ -61,7 +61,8 @@ def prune(info: PruneInfo, method: str, ratio: float):
         layerwise = False 
     else:
         raise ValueError(f"Unknown pruning method: {method}")
-    
+
+    prune_info = PruneInfo(network)
     amount = prune_info.ratio_to_amount(ratio)
     simple_prune(prune_info, pruning_cls, layerwise, amount=amount)
  
@@ -72,12 +73,10 @@ def simple_prune(
     layerwise: bool = False,
     **kwargs
 ):
-    pairs = prune_info.target_pairs()
+    pairs = list(prune_info.target_pairs())
 
     if not layerwise:
         prune_torch.global_unstructured(pairs, pruning_method, **kwargs)
-        return
-
-    for submodule, param_name in pairs:
-        pruning_method.apply(submodule, param_name, **kwargs)
-
+    else:
+        for submodule, param_name in pairs:
+            pruning_method.apply(submodule, param_name, **kwargs)
