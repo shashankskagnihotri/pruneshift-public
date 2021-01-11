@@ -168,17 +168,6 @@ def _collect_ckpts(ckpt_dir: str):
     return ckpt_dict
 
 
-@cli.command()
-@click.argument("paths", type=str, nargs=-1, required=True)
-@click.pass_obj
-def evaluate_shift(obj, paths):
-    """ Does evaluate models for distr shift."""
-    for path in paths:
-        print(_collect_ckpts(path))
-    # 1. Integrate the different checkpoints.
-    # 2. Start the different training runs without tensorboard.
-    # 3. What additional informations do we want to safe? The method
-
 
 @cli.command()
 @click.argument("paths", type=str, nargs=-1, required=True)
