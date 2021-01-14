@@ -19,11 +19,15 @@ A good package for imagenet models can be found here, unfortunately there is no 
 We leave out gradient based methods as they are hard to work with.
 
 ## TODOS:
-- Saturday: Is runner day, we implement rewind, evaluate at the end of a run.
-- Sunday: Is dataset day, we integrate augmix, Imagenette and ImageNetC.
-- Implement rewind. 2h
-- Integrate structured pruning. 2h
-
+Update augmix to cifar10:
+    - Such that we can have ImageNetC, ImageNetR
+Update the datamodules [Friday]:
+    - Such that we can have ImageNetC, ImageNetR
+    - We want one central factory function!
+Update the correct learning shedule [Saturday]:
+    - This should be done with hierachical configurations.
+    - Start pruning.
+Look into the hydra code [Sunday]
 
 
 ## Questions
@@ -35,8 +39,6 @@ We leave out gradient based methods as they are hard to work with.
 6. Does finetuning with augmix combined with hydra help?
 
 
-## Zen garden
-- We want to do experiments not frameworks!
-- Code is also configuration! Thus, click is better than hydra.
-- Speed matters!
-- Do not mess with gin or hydra :) But hydra was better in the end!
+## Zen Garden
+Drink Tea.
+

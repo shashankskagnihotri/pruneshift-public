@@ -23,6 +23,7 @@ def simple_aug(image, preprocess, args):
             image = op(image, args.aug_severity)
     return preprocess(image)
 
+
 def augmix(image, preprocess, args):
     aug_list = augmentations.augmentations
     if args.aug_list:

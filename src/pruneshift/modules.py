@@ -1,29 +1,32 @@
-# TODO: Add support for multiple optimizer and shedulers.
 from typing import Sequence
-from typing import Dict
+from typing import Optional
+from typing import Type
 
 import pytorch_lightning as pl
 from pytorch_lightning.metrics import Accuracy
 from pytorch_lightning.metrics import functional
 import torch
 import torch.nn as nn
+import torch.optim as optim
 from torch.nn import functional as F
-import gin
 
 
-@gin.configurable
 class VisionModule(pl.LightningModule):
-    """Module for training computer vision models."""
+    """Module for training and testing computer vision models."""
 
     def __init__(self,
                  network: nn.Module,
                  test_labels: Sequence[str] = None,
-                 lr: float = 0.0001,
-                 hparams: Dict = None):
+                 learning_rate: float = 0.0001,
+                 optimizer_cls: Optional[Type[optim.Optimizer]] = optim.Adam,
+                 scheduler_cls=None,
+                 monitor: str = None):
         super(VisionModule, self).__init__()
         self.network = network
-        self.lr = lr
-        self.hparams = hparams
+        self.learning_rate = learning_rate
+        self.optimizer_cls = optimizer_cls
+        self.scheduler_cls = scheduler_cls
+        self.monitor = monitor
 
         if test_labels is None:
             self.test_labels = ["acc"]
@@ -43,14 +46,14 @@ class VisionModule(pl.LightningModule):
 
     def training_step(self, batch, batch_idx):
         loss, acc = self._predict(batch)
-        self.log("train_loss", loss, on_step=False, on_epoch=True)
-        self.log("train_acc", acc, on_step=False, on_epoch=True)
+        self.log("train_loss", loss, on_step=False, on_epoch=True, sync_dist=True)
+        self.log("train_acc", acc, on_step=False, on_epoch=True, sync_dist=True)
         return loss
 
     def validation_step(self, batch, batch_idx):
         loss, acc = self._predict(batch)
-        self.log("val_loss", loss, on_step=False, on_epoch=True)
-        self.log("val_acc", acc, on_step=False, on_epoch=True)
+        self.log("val_loss", loss, on_step=False, on_epoch=True, sync_dist=True)
+        self.log("val_acc", acc, on_step=False, on_epoch=True, sync_dist=True)
 
     def test_step(self, batch, batch_idx, dataset_idx=0):
         x, y = batch
@@ -61,5 +64,16 @@ class VisionModule(pl.LightningModule):
             self.log(f"test_{label}", metric.compute())
 
     def configure_optimizers(self):
-        return torch.optim.Adam(self.parameters(), lr=self.lr)
+        if self.optimizer_cls is None:
+            return
 
+        config = {}
+        config["optimizer"] = self.optimizer_cls(self.parameters(), lr=self.learning_rate)
+
+        if self.scheduler_cls is not None:
+            config["scheduler"] = self.scheduler_cls(config["optimizer"])
+
+        if self.monitor is not None:
+            config["monitor"] = self.monitor
+
+        return config

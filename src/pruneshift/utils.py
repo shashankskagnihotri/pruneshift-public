@@ -5,8 +5,6 @@ import torch.nn.utils.prune as torch_prune
 import torch.nn as nn
 import torch
 
-import pytorch_lightning as pl
-
 
 def load_prune_ckpt(network: nn.Module, path: Union[str, Path]):
     """ Changes and loads the network accordingly to the checkpoint."""
@@ -40,3 +38,4 @@ def load_prune_ckpt(network: nn.Module, path: Union[str, Path]):
 
     network.load_state_dict(state_dict)
     return network
+

@@ -6,7 +6,6 @@ import re
 import torch
 from torch import nn as nn
 from torch.nn.utils import prune as prune_torch
-import gin
 
 
 from .prune_info import PruneInfo
@@ -24,7 +23,6 @@ class L1GradUnstructered(prune_torch.L1Unstructured):
         return super(L1GradUnstructered, self).compute_mask(t.grad, default_mask)
 
 
-@gin.configurable
 def prune(network: nn.Module, method: str, ratio: float):
     """Prunes a network inplace.
 
@@ -80,3 +78,4 @@ def simple_prune(
     else:
         for submodule, param_name in pairs:
             pruning_method.apply(submodule, param_name, **kwargs)
+

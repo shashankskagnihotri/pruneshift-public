@@ -3,12 +3,10 @@ from torch.utils.data import DataLoader, random_split
 import torchvision.datasets as torch_datasets
 from torchvision import transforms
 import pytorch_lightning as pl
-import gin
 
 from .datasets import CIFAR10C
 
 
-@gin.configurable
 def datamodule(
     name: str, root: str, batch_size: int = 32, num_workers: int = 5, **kwargs
 ) -> pl.LightningDataModule:
@@ -124,16 +122,17 @@ class CIFAR10CModule(CIFAR10Module):
         CIFAR10C(self.root, "snow")
 
     def setup(self, stage: str = None):
-        create_fn = torch_datasets.CIFAR10
+        datasets = [torch_datasets.CIFAR10(self.root, False, self.transform(False))]
 
-        if stage == "test" or stage is None:
-            self.test_dataset = create_fn(self.root, False,
-                                          transform=self.transform(False))
-        if stage == "fit" or stage is None:
-            trainset = create_fn(self.root, True, transform=self.transform())
-            trainset, valset = random_split(trainset, [45000, 5000])
-            self.train_dataset = trainset
-            self.val_dataset = valset
+        for distortion in CIFAR10C.distortions_list:
+            d = CIFAR10C(
+                root=self.root, transform=self.transform(False), distortion=distortion
+            )
+            d_lvls = d.lvl_subsets()
+            for lvl in self.lvls:
+                datasets.append(d_lvls[lvl - 1])
+
+        self.test_dataset = datasets
 
 
 class ImageNetModule(BaseDataModule):
