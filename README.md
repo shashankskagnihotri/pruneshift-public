@@ -16,18 +16,17 @@
 A good package for imagenet models can be found here, unfortunately there is no comparable collection for cifar10:
     https://github.com/rwightman/pytorch-image-models
 
-We leave out gradient based methods as they are hard to work with.
+We leave our gradient based methods as they are harder to work with.
+
+Learning Rate Warmup can be easily done by LambdaLR scheduler.
 
 ## TODOS:
-Update augmix to cifar10:
-    - Such that we can have ImageNetC, ImageNetR
-Update the datamodules [Friday]:
-    - Such that we can have ImageNetC, ImageNetR
-    - We want one central factory function!
-Update the correct learning shedule [Saturday]:
-    - This should be done with hierachical configurations.
-    - Start pruning.
-Look into the hydra code [Sunday]
+- Update the correct learning shedule [Saturday]:
+     - Integrate the correct optimizer, only nesterov sgd with momentum. 20 min
+     - Add augmix loss 20 min
+     - This should be done with hierachical configurations 2h
+- Look into the hydra code [Sunday]
+- Read the new pruning paper.
 
 
 ## Questions

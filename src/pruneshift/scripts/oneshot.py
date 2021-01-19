@@ -10,15 +10,16 @@ from .utils import save_config
 logger = logging.getLogger(__name__)
 
 
-# TODO: We want to finish this week ;)
 @hydra.main(config_path="configs", config_name="oneshot.yaml")
 def oneshot(cfg):
     """ Prunes one-shot or iteratively."""
     save_config(cfg)
-    network = call(cfg.network,  pretrained=True)
+    # Currently we should create the trainer always first.
+    trainer = create_trainer(cfg)
+
+    network = call(cfg.network)
     data_train = call(cfg.data.train)
     data_test = call(cfg.data.test)
-    trainer = create_trainer(cfg)
     if hasattr(data_test, "labels"):
         module = instantiate(cfg.module, network, data_test.labels)
     else:

@@ -1,3 +1,4 @@
+from functools import partial
 from pathlib import Path
 
 from hydra.utils import instantiate
@@ -9,24 +10,30 @@ from pytorch_lightning.loggers import CSVLogger
 
 
 def save_config(cfg: DictConfig):
-    with open(cfg.config_path, "w") as file:
+    with open(cfg.path.config, "w") as file:
         file.write(OmegaConf.to_yaml(cfg))
+
+
+def create_optim(cfg: DictConfig):
+    """ Creates factory functions regarding optimization."""
+    return {"optimizer_fn": partial(instantiate, cfg.optimizer),
+            "scheduler_fn": partial(instantiate, cfg.scheduler)}
 
 
 def create_trainer(cfg: DictConfig):
     """ Creates a `pl.Trainer` for our experiment setup."""
-    path = Path(cfg.logdir)
+    path = Path(cfg.path.logdir)
     callbacks = []
     # Creating a tensorboard and csv logger.
     tb_logger = TensorBoardLogger(path, name="tensorboard", version="")
     csv_logger = CSVLogger(path, name=None, version="")
     logger = [tb_logger, csv_logger]
-    callbacks.append(instantiate(cfg.model_checkpoint))
+    callbacks.append(instantiate(cfg.checkpoint))
 
-    if cfg.seed is None:
+    if cfg.seed.seed is None:
         deterministic = False
     else:
-        pl.seed_everything(cfg.seed)
+        pl.seed_everything(cfg.seed.seed)
         deterministic = True
 
     return instantiate(
@@ -34,5 +41,6 @@ def create_trainer(cfg: DictConfig):
         logger=logger,
         callbacks=callbacks,
         deterministic=deterministic,
-        weights_save_path=cfg.logdir,
+        weights_save_path=cfg.path.logdir,
     )
+

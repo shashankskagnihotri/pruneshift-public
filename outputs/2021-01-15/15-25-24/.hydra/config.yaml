@@ -1,0 +1,25 @@
+path:
+  standard:
+    logdir: ${env:EXPERIMENT_PATH}/${now:%Y-%m-%d}/${now:%H-%M-%S}
+    config: ${path.logdir}/configs.yaml
+    checkpoint: ${path.logdir}/checkpoints/
+    dataset: ${env:DATASET_PATH}
+    model: ${env:MODEL_PATH}
+    cifar10: ${path.dataset}
+    cifar100: ${path.dataset}
+datamodule:
+  _target_: pruneshift.datamodules.datamodule
+  root: ${path.cifar10}
+  num_workers: 10
+  batch_size: 128
+trainer:
+  max_epochs: 182
+  gpus: 1
+  benchmark: true
+module:
+  learning_rate: 0.1
+  momentum: 0.9
+  weight_decay: 0.0002
+  milestones:
+  - 91
+  - 136

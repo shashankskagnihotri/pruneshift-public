@@ -1,0 +1,7 @@
+transformers:
+  scale:
+    some: param
+    third: gusto
+  translate:
+    another: param
+transform: ${transformers.scale} ${transformers.translate}

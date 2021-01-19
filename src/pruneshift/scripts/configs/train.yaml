@@ -1,0 +1,6 @@
+
+defaults:
+    - path: standard
+    - checkpoint: only_best
+    - regime: cifar10
+

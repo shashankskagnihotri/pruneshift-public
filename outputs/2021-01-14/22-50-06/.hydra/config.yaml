@@ -1,0 +1,13 @@
+transformers:
+  scale:
+    some: param
+    third: gusto
+    another:
+      layer: exists
+  translate:
+    another: param
+transform:
+- ${transformers.scale}
+- ${transformers.translate}
+access:
+  test: ${transform.0.some}

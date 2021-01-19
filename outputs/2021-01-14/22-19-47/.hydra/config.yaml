@@ -1,0 +1,13 @@
+path:
+  logdir: ${env:EXPERIMENT_PATH}/${now:%Y-%m-%d}/${now:%H-%M-%S}
+  models: ${env:MODEL_PATH}
+  dataset_path: ${env:MODEL_PATH}
+  config_path: ${path.logdir}/config.yaml
+datamodule:
+  name: cifar10
+  num_workers: 10
+trainer:
+  gpus: 1
+network:
+  resnet18:
+    network_id: ${datamodule.name}_resnet18

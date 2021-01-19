@@ -1,0 +1,16 @@
+datamodule:
+  _target_: pruneshift.datamodules.datamodule
+  root: ${path.cifar10}
+  num_workers: 10
+  batch_size: 128
+trainer:
+  max_epochs: 182
+  gpus: 1
+  benchmark: true
+module:
+  learning_rate: 0.1
+  momentum: 0.9
+  weight_decay: 0.0002
+  milestones:
+  - 91
+  - 136

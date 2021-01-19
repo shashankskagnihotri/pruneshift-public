@@ -1,0 +1,14 @@
+net: resnet50
+dataset: cifar10
+test_dataset: ${dataset}
+seed: null
+path:
+  logdir: ${env:EXPERIMENT_PATH}/${now:%Y-%m-%d}/${now:%H-%M-%S}
+  models: ${env:MODEL_PATH}
+  dataset_path: Super Special Path
+  config_path: ${path.logdir}/configs.yaml
+network:
+  _target_: pruneshift.networks.network
+  network_id: ${dataset}_${net}
+  model_path: ${path.models}
+  version: ${seed}

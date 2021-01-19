@@ -5,15 +5,17 @@ import torch
 from torchvision.datasets.utils import download_and_extract_archive
 from torch.utils.data import Dataset
 
+from augmix.dataset import AugMixWrapper
+
 
 class ExternalDataset(Dataset):
     dir_name: str = None
     url: str = None
 
-    def __init__(self, root: str, transform=None):
+    def __init__(self, root: str, transform=None, download=False):
         self.root = root
         self.transform = transform
-        if not self.exists:
+        if not self.exists and download:
             self.download()
 
     @property
@@ -55,8 +57,8 @@ class CIFAR10C(ExternalDataset):
         "elastic_transform",
     ]
 
-    def __init__(self, root: str, distortion: str, transform=None):
-        super(CIFAR10C, self).__init__(root, transform)
+    def __init__(self, root: str, distortion: str, transform=None, download=False):
+        super(CIFAR10C, self).__init__(root, transform, download)
         self.distortion = distortion
         self._images = np.load(self.image_path)
         self._labels = np.load(self.label_path)
@@ -87,9 +89,7 @@ class CIFAR10C(ExternalDataset):
         return 50000 
 
 
-class ImageNetC(CIFAR10C):
-    dir_name = "ImageNet-C"
-    url = "https://zenodo.org/record/2535967/files/CIFAR-10-C.tar"
+class CIFAR100C(CIFAR10C):
+    dir_name = "CIFAR-100-C"
+    url = "https://zenodo.org/record/3555552/files/CIFAR-100-C.tar"
 
-    def __len__(self):
-        return 2

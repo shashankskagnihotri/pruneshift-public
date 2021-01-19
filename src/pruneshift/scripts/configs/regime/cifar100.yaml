@@ -1,0 +1,43 @@
+# @package _global_
+
+datamodule:
+    _target_: pruneshift.datamodules.datamodule
+    name: cifar100
+    root: ${path.dataset}
+    num_workers: 10
+    batch_size: 128
+
+test_datamodule:
+    _target_: pruneshift.datamodules.datamodule
+    name: cifar100_corrupted
+    root: ${path.dataset}
+    num_workers: ${datamodule.num_workers}
+    batch_size: ${datamodule.batch_size}
+
+network:
+    _target_: pruneshift.networks.network
+    network_id: "cifar100_resnet50"
+
+trainer:
+    _target_: pytorch_lightning.Trainer
+    max_epochs: 182
+    gpus: 1
+    benchmark: True
+
+module:
+    _target_: pruneshift.modules.VisionModule
+    learning_rate: 0.1
+
+scheduler:
+    _target_: pruneshift.modules.MultiStepWarmUpLr
+    milestones: [91, 136]
+
+optimizer:
+    _target_: torch.optim.SGD
+    momentum: 0.9
+    weight_decay: 0.0002
+    nesterov: True
+
+seed:
+    seed: 0
+

@@ -26,6 +26,7 @@ def load_prune_ckpt(network: nn.Module, path: Union[str, Path]):
         if param_name in state_dict:
             continue
         elif param_name + "_orig" in state_dict:
+            # TODO: This is probably wrong and can be simplified.
             idx = param_name.rfind(".")
             module_name, param_name = param_name[:idx], param_name[idx + 1:]
             module = network

@@ -1,0 +1,12 @@
+# @package _global_
+
+path:
+    logdir: ${env:EXPERIMENT_PATH}/${now:%Y-%m-%d}/${now:%H-%M-%S}
+    config: ${path.logdir}/configs.yaml
+    checkpoint: ${path.logdir}/checkpoints/
+    dataset: ${env:DATASET_PATH}
+    model: ${env:MODEL_PATH}
+
+hydra:
+    run:
+        dir: ${path.logdir}
