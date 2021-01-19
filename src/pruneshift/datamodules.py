@@ -7,6 +7,7 @@ import pytorch_lightning as pl
 
 from .datasets import CIFAR10C
 from .datasets import CIFAR100C
+from .datasets import TransformWrapper
 from augmix.dataset import AugMixWrapper
 
 
@@ -19,7 +20,7 @@ def datamodule(
     """ Creates a LightningDataModule.
     Args:
         name: Name of the dataset/datamodule.
-        root: Where to download the data if necessary.
+        root: Where to save/find the data.
         batch_size: The batch size used for the datamodule.
         num_workers: Number of workers used for the dataloaders.
     Returns:
@@ -53,7 +54,8 @@ class BaseDataModule(pl.LightningDataModule):
 
     def setup(self, stage: str):
         if stage == "fit":
-            self.train_dataset, self.val_dataset = self.create_dataset("fit", self.transform())
+            transform = [self.transform(), self.transform(False)]
+            self.train_dataset, self.val_dataset = self.create_dataset("fit", transform)
         if stage == "test":
             self.test_dataset = self.create_dataset("test", self.transform(False))
 
@@ -85,14 +87,16 @@ class BaseDataModule(pl.LightningDataModule):
 
 class AugmixDataModule(BaseDataModule):
 
-    def create_dataset(self, mode: str, transform):
-        # The preprocessing transform takes place after augmix!
-        datasets = super(AugmixDataModule, self).create_dataset(mode, None)
+    def create_dataset(self, mode: str, transform=None):
+        if mode == "test":
+            # The preprocessing transform takes place after augmix!
+            return super(AugmixDataModule, self).create_dataset(mode, transform)
 
-        if mode == "fit":
-            return [AugMixWrapper(d, transform) for d in datasets]
+        datasets = super(AugmixDataModule, self).create_dataset(mode, [None, None])
+        train_dataset = AugMixWrapper(datasets[0], transform[0])
+        val_dataset = TransformWrapper(datasets[1], transform[1])
 
-        return AugMixWrapper(datasets, transform)
+        return train_dataset, val_dataset
 
 
 class CorruptedDataModule(BaseDataModule):
@@ -120,7 +124,7 @@ class CorruptedDataModule(BaseDataModule):
     def corrupted_datasets(self, corruption: str):
         raise NotImplementedError
 
-    def create_dataset(self, stage: str, transform):
+    def create_dataset(self, stage: str, transform=None):
         if stage == "fit":
             msg = "Corrupted dataset should not be used for training"
             raise RuntimeError(msg)
@@ -143,10 +147,14 @@ class CIFAR10Module(BaseDataModule):
         torch_datasets.CIFAR10(self.root, train=True, download=True)
         torch_datasets.CIFAR10(self.root, train=False, download=True)
 
-    def create_dataset(self, mode: str, transform):
+    def create_dataset(self, mode: str, transform=None):
         if mode == "fit":
-            dataset = torch_datasets.CIFAR10(self.root, True, transform)
-            return random_split(dataset, [45000, 5000]) 
+            dataset = torch_datasets.CIFAR10(self.root, True)
+            train_dataset, val_dataset = random_split(dataset, [45000, 5000])
+            train_dataset = TransformWrapper(train_dataset, transform[0])
+            val_dataset = TransformWrapper(val_dataset, transform[1])
+            return train_dataset, val_dataset
+
         return torch_datasets.CIFAR10(self.root, False, transform)
 
     def transform(self, train: bool = True):
@@ -169,11 +177,15 @@ class CIFAR100Module(BaseDataModule):
         torch_datasets.CIFAR100(self.root, train=True, download=True)
         torch_datasets.CIFAR100(self.root, train=False, download=True)
 
-    def create_dataset(self, mode: str, transform):
+    def create_dataset(self, mode: str, transform=None):
         if mode == "fit":
-            dataset = torch_datasets.CIFAR10(self.root, True, transform)
-            return random_split(dataset, [45000, 5000]) 
-        return torch_datasets.CIFAR10(self.root, False, transform)
+            dataset = torch_datasets.CIFAR100(self.root, True)
+            train_dataset, val_dataset = random_split(dataset, [45000, 5000])
+            train_dataset = TransformWrapper(train_dataset, transform[0])
+            val_dataset = TransformWrapper(val_dataset, transform[1])
+            return train_dataset, val_dataset
+
+        return torch_datasets.CIFAR100(self.root, False, transform)
 
     def transform(self, train: bool = True):
         transform = []

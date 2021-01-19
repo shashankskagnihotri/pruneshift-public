@@ -20,6 +20,7 @@ NETWORK_REGEX = re.compile(
     r"(?P<group>[a-zA-Z]+)(?P<num_classes>[0-9]+)_(?P<name>[a-zA-Z0-9_]+)"
 )
 
+
 def protect_classifier(name: str, network: nn.Module):
     if name[: 6] == "resnet":
         network.fc.is_protected = True

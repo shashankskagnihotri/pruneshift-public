@@ -7,6 +7,20 @@ from torch.utils.data import Dataset
 
 from augmix.dataset import AugMixWrapper
 
+class TransformWrapper(Dataset):
+    def __init__(self, dataset, transform):
+        self.dataset = dataset
+        self.transform = transform
+
+    def __getitem__(self, idx):
+        if self.transform is None:
+            return self.dataset[idx]
+        x, y = self.dataset[idx]
+        return self.transform(x), y
+
+    def __len__(self):
+        return len(self.dataset)
+
 
 class ExternalDataset(Dataset):
     dir_name: str = None
@@ -92,4 +106,3 @@ class CIFAR10C(ExternalDataset):
 class CIFAR100C(CIFAR10C):
     dir_name = "CIFAR-100-C"
     url = "https://zenodo.org/record/3555552/files/CIFAR-100-C.tar"
-

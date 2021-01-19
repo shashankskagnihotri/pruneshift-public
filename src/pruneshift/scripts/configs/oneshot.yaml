@@ -1,51 +1,14 @@
-logdir: ${env:EXPERIMENT_PATH}/${now:%Y-%m-%d}/${now:%H-%M-%S}
-config_path: ${logdir}/configs.yaml
 
-seed:
-  None
+defaults:
+    - path: standard
+    - checkpoint: only_best
+    - regime: cifar10
 
-trainer:
-  _target_: pytorch_lightning.Trainer
-  max_epochs: 200
-  min_epochs: 1
-  gpus: 1
-  benchmark: True
-
-model_checkpoint:
-  _target_: pytorch_lightning.callbacks.ModelCheckpoint
-  period: 20
-  save_top_k: -1
-
-network:
-  _target_: pruneshift.topologies.create_network
-  name: "cifar10_resnet50"
-
-# TODO: Here we can relink all the important paths. For the different
-#       datasets :)
-
-data:
-  train:
-    _target_: pruneshift.datamodules.datamodule
-    name: "cifar10"
-    root: ${env:DATASET_PATH}
-    batch_size: 128
-    num_workers: 3
-  test:
-    _target_: pruneshift.datamodules.datamodule
-    name: "cifar10_corrupted"
-    root: ${env:DATASET_PATH}
-    batch_size: 128
-    num_workers: 6
-
-module:
-  _target_: pruneshift.modules.VisionModule
-  learning_rate: 0.001
 
 prune:
   _target_: pruneshift.prune.prune
-  method: "global_weight"
-  ratio: 2
+  name: global_weight
+  ratios: 2
 
-hydra:
-  run:
-    dir: ${logdir}
+network:
+  model_path: ${path.model}

@@ -1,6 +1,5 @@
 import logging
 
-from omegaconf import OmegaConf
 import hydra
 from hydra.utils import instantiate
 from hydra.utils import call
@@ -8,11 +7,8 @@ from hydra.utils import call
 from pruneshift.scripts.utils import create_trainer
 from pruneshift.scripts.utils import save_config
 from pruneshift.scripts.utils import create_optim
-from pruneshift.networks import NETWORK_REGEX
 
 logger = logging.getLogger(__name__)
-
-
 
 
 @hydra.main(config_path="configs", config_name="train.yaml")
@@ -37,4 +33,3 @@ def train(cfg):
 
 if __name__ == "__main__":
     train()
-

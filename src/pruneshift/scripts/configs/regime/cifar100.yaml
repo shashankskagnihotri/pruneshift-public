@@ -17,6 +17,7 @@ test_datamodule:
 network:
     _target_: pruneshift.networks.network
     network_id: "cifar100_resnet50"
+    version: 0
 
 trainer:
     _target_: pytorch_lightning.Trainer
