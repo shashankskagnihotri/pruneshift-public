@@ -1,8 +1,0 @@
-testo:
-  other: ${test.some}
-test:
-  some: things
-datamodule:
-  name: cifar10
-some:
-  weird: shit

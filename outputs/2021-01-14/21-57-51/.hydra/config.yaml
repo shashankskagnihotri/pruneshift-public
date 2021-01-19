@@ -1,4 +1,0 @@
-datamodule:
-  name: cifar10
-some:
-  weird: shit

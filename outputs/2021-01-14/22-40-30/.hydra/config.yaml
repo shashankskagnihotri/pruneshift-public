@@ -1,8 +1,0 @@
-transformers:
-  scale:
-    some: param
-  translate:
-    another: param
-transform:
-- ${transformers.scale}
-- ${transformers.translate}
