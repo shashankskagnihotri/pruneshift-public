@@ -1,11 +1,14 @@
 import os
+from pathlib import Path
 
 import numpy as np
 import torch
 from torchvision.datasets.utils import download_and_extract_archive
+from torchvision.datasets import ImageFolder
 from torch.utils.data import Dataset
 
 from augmix.dataset import AugMixWrapper
+
 
 class TransformWrapper(Dataset):
     def __init__(self, dataset, transform):
@@ -106,3 +109,32 @@ class CIFAR10C(ExternalDataset):
 class CIFAR100C(CIFAR10C):
     dir_name = "CIFAR-100-C"
     url = "https://zenodo.org/record/3555552/files/CIFAR-100-C.tar"
+
+
+class ImageNet100C:
+    corruptions = [
+        "brightness",
+        "contrast",
+        "defocus_blur",
+        "elastic_transform",
+        "fog",
+        "frost",
+        "gaussian_noise",
+        "glass_blur",
+        "impulse_noise",
+        "jpeg_compression",
+        "motion_blur",
+        "pixelate",
+        "shot_noise",
+        "snow",
+        "zoom_blur",
+    ]
+
+    def __init__(self, root: str, distortion: str, transform=None, download=False):
+        self.root = root
+        self.distortion = distortion
+        self.transform = transform
+
+    def lvl_subsets(self):
+        path = Path(self.root)/self.distortion
+        return [ImageFolder(path/str(i), self.transform) for i in range(1, 6)]
