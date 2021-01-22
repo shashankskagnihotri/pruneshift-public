@@ -7,13 +7,13 @@ import torch
 cifar10_path = None 
 
 
-def load_model(model, arch, device):
+def load_model(model, arch):
     global cifar10_path
     if cifar10_path is None:
         cifar10_path = Path(os.environ["MODEL_PATH"])/"cifar10"
 
     path = cifar10_path / f"{arch}.pt"
-    model.load_state_dict(torch.load(path, map_location=device))
+    model.load_state_dict(torch.load(path))
 
 
 from .mobilenetv2 import *
