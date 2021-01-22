@@ -46,7 +46,6 @@ def prune(network: nn.Module, method: str, ratio: float):
         pruning_cls = L1GradUnstructered
         layerwise = False
     elif method == "layer_grad":
-        raise NotImplementedError
         pruning_cls = L1GradUnstructered
         layerwise = True
         raise NotImplementedError
@@ -56,7 +55,7 @@ def prune(network: nn.Module, method: str, ratio: float):
         raise NotImplementedError
     elif method == "random":
         pruning_cls = prune_torch.RandomUnstructured
-        layerwise = False 
+        layerwise = False
     else:
         raise ValueError(f"Unknown pruning method: {method}")
 

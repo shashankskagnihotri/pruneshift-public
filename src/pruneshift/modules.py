@@ -19,11 +19,8 @@ class MultiStepWarmUpLr(LambdaLR):
 
         def lr_schedule(epoch):
             if epoch < warmup_end:
-                factor = (epoch + 1) / warmup_end
-            else:
-                factor = gamma ** bisect_right(milestones, epoch)
-            print(f"\n Learning rate is {factor}")
-            return factor
+                return (epoch + 1) / warmup_end
+            return gamma ** bisect_right(milestones, epoch)
 
         super(MultiStepWarmUpLr, self).__init__(optimizer, lr_schedule)
 
