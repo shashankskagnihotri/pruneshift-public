@@ -6,6 +6,7 @@ path:
     checkpoint: ${path.logdir}/checkpoints/
     dataset: ${env:DATASET_PATH}
     model: ${env:MODEL_PATH}
+    imagenet100: /misc/scratchSSD2/datasets/ILSVRC2012-100
 
 hydra:
     run:

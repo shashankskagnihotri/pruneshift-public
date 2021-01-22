@@ -111,13 +111,13 @@ class AugmixDataModule(BaseDataModule):
         datasets = super(AugmixDataModule, self).create_dataset(mode, transform)
         train_dataset = AugMixWrapper(datasets[0], self.normalizer())
 
-        return train_dataset, datasets[0]
+        return train_dataset, datasets[1]
 
     def setup(self, stage: str):
         if stage == "fit":
             transform = [self.preprocessor(), self.preprocessor(False)]
             train_dataset, val_dataset = self.create_dataset("fit", transform)
-            # Only difference!
+            # Only difference, we do not need to normalize as this is done by the augment wrapper!
             self.train_dataset = train_dataset
             self.val_dataset = TransformWrapper(val_dataset, self.normalizer())
         if stage == "test":
