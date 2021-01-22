@@ -78,4 +78,3 @@ def simple_prune(
     else:
         for submodule, param_name in pairs:
             pruning_method.apply(submodule, param_name, **kwargs)
-

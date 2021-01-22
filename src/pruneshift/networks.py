@@ -14,6 +14,12 @@ import torch.nn as nn
 import torchvision.models as imagenet_models
 
 import cifar10_models as cifar_models
+import pytorch_resnet_cifar10.resnet as resnet_cifar_models
+
+import logging
+
+
+logger = logging.getLogger(__name__)
 
 
 NETWORK_REGEX = re.compile(
@@ -22,6 +28,7 @@ NETWORK_REGEX = re.compile(
 
 
 def protect_classifier(name: str, network: nn.Module):
+    """ Defines which layers are protected. """
     if name[: 6] == "resnet":
         network.fc.is_protected = True
     elif name[: 3] == "vgg":
@@ -73,9 +80,13 @@ def network(
     num_classes = int(match.group("num_classes"))
     name = match.group("name")
 
+    logger.info(f"Creating Network {name} for {group} with {num_classes} classes.")
+
     if group == "cifar":
         if download:
             raise RuntimeError("Can not download trained Cifar models.")
+        # if name[: 6] == "resnet":
+        #     network_fn = getattr(resnet_cifar_models, name)
         network_fn = getattr(cifar_models, name)
     elif group == "imagenet":
         network_fn = getattr(imagenet_models, name)

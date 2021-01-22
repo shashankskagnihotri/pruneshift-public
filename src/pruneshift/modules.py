@@ -8,6 +8,7 @@ from pytorch_lightning.metrics import functional
 import torch
 import torch.nn as nn
 import torch.optim as optim
+from torch.optim.lr_scheduler import CosineAnnealingWarmRestarts
 from torch.optim.lr_scheduler import LambdaLR
 from torch.nn import functional as F
 
@@ -18,8 +19,11 @@ class MultiStepWarmUpLr(LambdaLR):
 
         def lr_schedule(epoch):
             if epoch < warmup_end:
-                return (epoch + 1) / warmup_end
-            return gamma ** bisect_right(milestones, epoch)
+                factor = (epoch + 1) / warmup_end
+            else:
+                factor = gamma ** bisect_right(milestones, epoch)
+            print(f"\n Learning rate is {factor}")
+            return factor
 
         super(MultiStepWarmUpLr, self).__init__(optimizer, lr_schedule)
 
@@ -30,6 +34,7 @@ def standard_loss(network: nn.Module, batch):
     loss = F.cross_entropy(logits, y)
     acc = functional.accuracy(torch.argmax(logits, 1), y)
     return loss, acc
+
 
 def augmix_loss(network: nn.Module, batch, alpha: float = 0.0001):
     """ Loss for the augmix datasets. Adopted from the augmix repository.
@@ -121,15 +126,14 @@ class VisionModule(pl.LightningModule):
         if self.optimizer_fn is None:
             return
 
-        config = {}
-        config["optimizer"] = self.optimizer_fn(
-            self.parameters(), lr=self.learning_rate
-        )
+        optimizer = self.optimizer_fn(self.parameters(), lr=self.learning_rate)
 
-        if self.scheduler_fn is not None:
-            config["scheduler"] = self.scheduler_fn(optimizer=config["optimizer"])
+        if self.scheduler_fn is None:
+            return optimizer
+
+        scheduler = {"scheduler": self.scheduler_fn(optimizer)}
 
         if self.monitor is not None:
-            config["monitor"] = self.monitor
+            scheduler["monitor"] = self.monitor
 
-        return config
+        return [optimizer], [scheduler]

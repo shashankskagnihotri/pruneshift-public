@@ -1,7 +1,5 @@
 """ Provides the data modules we need for our experiments.
 
-This unfortunately got way too complicated and proves modular programming
-is often superior to object-oriented programming.
 """
 import logging
 from pathlib import Path
@@ -42,11 +40,12 @@ class BaseDataModule(pl.LightningDataModule):
     mean = None
     std = None
 
-    def __init__(self, root: str, batch_size: int, num_workers: int):
+    def __init__(self, root: str, batch_size: int, num_workers: int, with_normalize: bool = True):
         super(BaseDataModule, self).__init__()
         self.root = root
         self.batch_size = batch_size
         self.num_workers = num_workers
+        self.with_normalize = with_normalize
         self.train_dataset = None
         self.val_dataset = None
         self.test_dataset = None
@@ -60,10 +59,11 @@ class BaseDataModule(pl.LightningDataModule):
         raise NotImplementedError
 
     def normalizer(self):
-        return transforms.Compose([
-            transforms.ToTensor(),
-            transforms.Normalize(self.mean, self.std),
-        ])
+        ts = [transforms.ToTensor()]
+        if self.with_normalize:
+            ts.append(transforms.Normalize(self.mean, self.std))
+
+        return transforms.Compose(ts)
 
     def preprocessor(self, train: bool = True):
         raise NotImplementedError
@@ -108,19 +108,30 @@ class AugmixDataModule(BaseDataModule):
         if mode == "test":
             return super(AugmixDataModule, self).create_dataset(mode, transform)
 
-        datasets = super(AugmixDataModule, self).create_dataset(mode, [None, None])
-        train_dataset = AugMixWrapper(datasets[0], transform[0])
-        val_dataset = TransformWrapper(datasets[1], transform[1])
+        datasets = super(AugmixDataModule, self).create_dataset(mode, transform)
+        train_dataset = AugMixWrapper(datasets[0], self.normalizer())
 
-        return train_dataset, val_dataset
+        return train_dataset, datasets[0]
+
+    def setup(self, stage: str):
+        if stage == "fit":
+            transform = [self.preprocessor(), self.preprocessor(False)]
+            train_dataset, val_dataset = self.create_dataset("fit", transform)
+            # Only difference!
+            self.train_dataset = train_dataset
+            self.val_dataset = TransformWrapper(val_dataset, self.normalizer())
+        if stage == "test":
+            test_datasets = self.create_dataset("test", self.preprocessor(False))
+            assert isinstance(test_datasets, list)
+            self.test_dataset = [TransformWrapper(d, self.normalizer()) for d in test_datasets]
 
 
 class CorruptedDataModule(BaseDataModule):
 
-    corr_dataset_cls = None 
+    corr_dataset_cls = None
 
-    def __init__(self, root: str, batch_size: int, num_workers: int, lvls=None):
-        super(CorruptedDataModule, self).__init__(root, batch_size, num_workers)
+    def __init__(self, root: str, batch_size: int, num_workers: int, lvls=None, with_normalize: bool = True):
+        super(CorruptedDataModule, self).__init__(root, batch_size, num_workers, with_normalize)
         self.lvls = range(1, 6) if lvls is None else lvls
 
     def prepare_data(self):
@@ -137,14 +148,11 @@ class CorruptedDataModule(BaseDataModule):
                 labels.append("{}_{}".format(distortion, lvl))
         return labels
 
-    def corrupted_datasets(self, corruption: str):
-        raise NotImplementedError
-
     def create_dataset(self, stage: str, transform=None):
         if stage == "fit":
             return super(CorruptedDataModule, self).create_dataset(stage, transform)
 
-        datasets = [super(CorruptedDataModule, self).create_dataset(stage, transform)]
+        datasets = super(CorruptedDataModule, self).create_dataset(stage, transform)
 
         for distortion in self.corr_dataset_cls.distortions_list:
             d = self.corr_dataset_cls(self.root, distortion, transform)
@@ -165,15 +173,16 @@ class CIFAR10Module(BaseDataModule):
         self.cifar_cls(self.root, train=True, download=True)
         self.cifar_cls(self.root, train=False, download=True)
 
-    def create_dataset(self, mode: str, transform=None):
-        if mode == "fit":
-            dataset = self.cifar_cls(self.root, True)
-            train_dataset, val_dataset = random_split(dataset, [45000, 5000])
-            train_dataset = TransformWrapper(train_dataset, transform[0])
-            val_dataset = TransformWrapper(val_dataset, transform[1])
+    def create_dataset(self, stage: str, transform=None):
+        if stage == "fit":
+            train_dataset = self.cifar_cls(self.root, True, transform[0])
+            val_dataset = self.cifar_cls(self.root, False, transform[1])
+            # train_dataset, val_dataset = random_split(dataset, [45000, 5000])
+            # train_dataset = TransformWrapper(train_dataset, transform[0])
+            # val_dataset = TransformWrapper(val_dataset, transform[1])
             return train_dataset, val_dataset
 
-        return self.cifar_cls(self.root, False, transform)
+        return [self.cifar_cls(self.root, False, transform)]
 
     def preprocessor(self, train: bool = True):
         if not train:
@@ -206,7 +215,7 @@ class ImageNet100Module(BaseDataModule):
             val_dataset = ImageFolder(Path(self.root)/"val", transform[1])
             return train_dataset, val_dataset
 
-        return ImageFolder(Path(self.root)/"val", transform)
+        return [ImageFolder(Path(self.root)/"val", transform)]
 
     def preprocessor(self, train: bool = True):
         ts = []

@@ -6,7 +6,7 @@ from omegaconf import DictConfig, OmegaConf
 import pytorch_lightning as pl
 from pytorch_lightning.loggers import TensorBoardLogger
 from pytorch_lightning.loggers import CSVLogger
-
+from pytorch_lightning.callbacks import LearningRateMonitor
 
 
 def save_config(cfg: DictConfig):
@@ -29,6 +29,8 @@ def create_trainer(cfg: DictConfig):
     csv_logger = CSVLogger(path, name=None, version="")
     logger = [tb_logger, csv_logger]
     callbacks.append(instantiate(cfg.checkpoint))
+    # We also want to log the learning rate.
+    callbacks.append(LearningRateMonitor("epoch"))
 
     if cfg.seed.seed is None:
         deterministic = False

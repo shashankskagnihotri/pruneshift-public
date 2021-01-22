@@ -7,13 +7,6 @@ datamodule:
     num_workers: 10
     batch_size: 128
 
-test_datamodule:
-    _target_: pruneshift.datamodules.datamodule
-    name: cifar100_corrupted
-    root: ${path.dataset}
-    num_workers: ${datamodule.num_workers}
-    batch_size: ${datamodule.batch_size}
-
 network:
     _target_: pruneshift.networks.network
     network_id: "cifar100_resnet50"

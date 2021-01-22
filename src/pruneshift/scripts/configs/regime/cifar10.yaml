@@ -4,7 +4,7 @@ datamodule:
     _target_: pruneshift.datamodules.datamodule
     name: cifar10
     root: ${path.dataset}
-    num_workers: 10
+    num_workers: 15
     batch_size: 128
 
 test_datamodule:
@@ -40,5 +40,5 @@ optimizer:
     nesterov: True
 
 seed:
-    seed: 0
+    seed: 1
 
