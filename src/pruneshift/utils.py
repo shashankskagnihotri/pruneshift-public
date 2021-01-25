@@ -6,20 +6,25 @@ import torch.nn as nn
 import torch
 
 
-def load_prune_ckpt(network: nn.Module, path: Union[str, Path]):
-    """ Changes and loads the network accordingly to the checkpoint."""
-    # 1. First convert the state_dict with the flat parameter names.
+def load_state_dict(path: Union[str, Path]):
     state_dict = torch.load(path)
 
-    if "state_dict" in state_dict:
-        # If true this is ckpt by the VisionModule.
-        state_dict = state_dict["state_dict"]
+    if "state_dict" not in state_dict:
+        return state_dict
 
-        def _prune_name(name):
-            idx = name.find(".")
-            return name[idx + 1:]
+    state_dict = state_dict["state_dict"]
 
-        state_dict = {_prune_name(n): p for n, p in state_dict.items()}
+    def prune_name(name):
+        idx = name.find(".")
+        return name[idx + 1:]
+
+    return {prune_name(n): p for n, p in state_dict.items()}
+
+
+def load_pruned_state_dict(network: nn.Module, path: Union[str, Path]):
+    """ Changes and loads the network accordingly to the checkpoint."""
+    # 1. First convert the state_dict with the flat parameter names.
+    state_dict = load_state_dict(path)
 
     # 2. Find all params that need to be pruned.
     for param_name, param in list(network.named_parameters()):
@@ -39,4 +44,3 @@ def load_prune_ckpt(network: nn.Module, path: Union[str, Path]):
 
     network.load_state_dict(state_dict)
     return network
-

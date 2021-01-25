@@ -1,4 +1,3 @@
-# TODO: Add structured pruning.
 from typing import Type, Dict, Union
 import logging
 
@@ -23,7 +22,7 @@ class L1GradUnstructered(prune_torch.L1Unstructured):
         return super(L1GradUnstructered, self).compute_mask(t.grad, default_mask)
 
 
-def prune(network: nn.Module, method: str, ratio: float):
+def prune(network: nn.Module, method: str, ratio: float) -> PruneInfo:
     """Prunes a network inplace.
 
     Note that some networks require having loaded a gradient already.
@@ -33,7 +32,7 @@ def prune(network: nn.Module, method: str, ratio: float):
         method: The name of the pruning method.
 
     Returns:
-        Returns the same module but pruned. 
+        Returns info about the pruning.
     """
 
     if method == "global_weight":
@@ -62,7 +61,8 @@ def prune(network: nn.Module, method: str, ratio: float):
     prune_info = PruneInfo(network)
     amount = prune_info.ratio_to_amount(ratio)
     simple_prune(prune_info, pruning_cls, layerwise, amount=amount)
- 
+
+    return prune_info
 
 def simple_prune(
     prune_info: PruneInfo,

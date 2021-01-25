@@ -4,8 +4,9 @@ import hydra
 from hydra.utils import instantiate
 from hydra.utils import call
 
-from .utils import create_trainer
-from .utils import save_config
+from pruneshift.scripts.utils import create_trainer
+from pruneshift.scripts.utils import save_config
+from pruneshift.scripts.utils import create_optim
 
 logger = logging.getLogger(__name__)
 
@@ -16,24 +17,29 @@ def oneshot(cfg):
     save_config(cfg)
     # Currently we should create the trainer always first.
     trainer = create_trainer(cfg)
-
     network = call(cfg.network)
-    data_train = call(cfg.data.train)
-    data_test = call(cfg.data.test)
-    if hasattr(data_test, "labels"):
-        module = instantiate(cfg.module, network, data_test.labels)
-    else:
-        module = instantiate(cfg.module, network)
-    # print("Building gradients...")
-    # batch_gradient(module, data)
+    data = call(cfg.datamodule)
+    optim_args = create_optim(cfg)
 
-    logger.info("Pruning the network.")
-    call(cfg.prune, network, ratio=cfg.ratio)
-    logger.info("Fine-tuning and testing of the network.")
-    trainer.fit(module, datamodule=data_train)
-    trainer.test(module, datamodule=data_test)
+    module = instantiate(cfg.module, network, data.labels, **optim_args)
+
+    ratios = cfg.prune.ratio
+
+    if isinstance(ratios, (int, float)):
+        ratios = [ratios]
+
+    for ratio in ratios:
+        logger.info("Starting with pruning...")
+        info = call(cfg.prune, module, ratio=ratio)
+        logger.info("\n %r" % info.summary())
+        # module = instantiate(cfg.module, network, data.labels, **optim_args)
+
+        logger.info("Fine-tuning of the network...")
+        trainer.fit(module, datamodule=data)
+
+    logger.info("Starting with testing...")
+    trainer.test(module, datamodule=data)
 
 
 if __name__ == "__main__":
     oneshot()
-

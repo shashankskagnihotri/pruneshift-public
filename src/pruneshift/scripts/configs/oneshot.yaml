@@ -1,14 +1,20 @@
-
 defaults:
     - path: standard
     - checkpoint: only_best
     - regime: cifar10
 
+network:
+  model_path: ${path.model}
+  version: 0
 
 prune:
   _target_: pruneshift.prune.prune
-  name: global_weight
-  ratios: 2
+  method: global_weight
+  ratio: 2
 
-network:
-  model_path: ${path.model}
+# Turn off the weights summary :)
+trainer:
+  weights_summary: null
+
+
+

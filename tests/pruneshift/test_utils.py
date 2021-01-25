@@ -4,7 +4,7 @@ import pytest
 import torch
 import torch.nn.utils.prune as torch_prune
 
-from pruneshift.utils import load_prune_ckpt
+from pruneshift.utils import load_pruned_state_dict
 from pruneshift.prune_info import PruneInfo
 import pytorch_lightning as pl
 from conftest import DummyNet
@@ -33,5 +33,5 @@ def ckpt_path(tmpdir, dummy_net, lightning: bool = False):
 
 
 def test_load_pruned_ckpt(dummy_net, ckpt_path):
-    loaded_net = load_prune_ckpt(DummyNet(), ckpt_path)
+    loaded_net = load_pruned_state_dict(DummyNet(), ckpt_path)
     assert (PruneInfo(dummy_net).summary() == PruneInfo(loaded_net).summary()).to_numpy().all()

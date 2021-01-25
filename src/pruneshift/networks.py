@@ -13,8 +13,8 @@ import torch
 import torch.nn as nn
 import torchvision.models as imagenet_models
 
+from .utils import load_state_dict
 import cifar10_models as cifar_models
-import pytorch_resnet_cifar10.resnet as resnet_cifar_models
 
 import logging
 
@@ -46,7 +46,7 @@ def load_checkpoint(
     """Loads a checkpoint."""
     version = 0 if version is None else version
     path = Path(model_path) / f"{network_id}.{version}"
-    state = torch.load(path)
+    state = load_state_dict(path)
     network.load_state_dict(state)
 
 

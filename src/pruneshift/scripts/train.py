@@ -13,20 +13,18 @@ logger = logging.getLogger(__name__)
 
 @hydra.main(config_path="configs", config_name="train.yaml")
 def train(cfg):
-    """ Prunes one-shot or iteratively."""
+    """ Trains neural networks."""
     save_config(cfg)
     trainer = create_trainer(cfg)
     # Currently we should initialize the trainer first because of the seed.
     network = call(cfg.network)
     data = call(cfg.datamodule)
     optim_args = create_optim(cfg)
-    if hasattr(data, "labels"):
-        module = instantiate(cfg.module, network, data.labels, **optim_args)
-    else:
-        module = instantiate(cfg.module, network, **optim_args)
-   
-    logger.info("Fine-tuning and testing of the network.")
+    module = instantiate(cfg.module, network, data.labels, **optim_args)
+
+    logger.info("Starting with training...")
     trainer.fit(module, datamodule=data)
+    logger.info("Starting with testing...")
     trainer.test(module, datamodule=data)
 
 

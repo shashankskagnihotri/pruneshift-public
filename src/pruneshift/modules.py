@@ -8,7 +8,6 @@ from pytorch_lightning.metrics import functional
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from torch.optim.lr_scheduler import CosineAnnealingWarmRestarts
 from torch.optim.lr_scheduler import LambdaLR
 from torch.nn import functional as F
 
@@ -98,6 +97,7 @@ class VisionModule(pl.LightningModule):
         return self.network(x)
 
     def training_step(self, batch, batch_idx):
+        # TODO: Make this extensible for Shashank
         if not isinstance(batch[0], torch.Tensor):
             loss_fn = partial(augmix_loss, alpha=self.augmix_loss_alpha)
         else:
@@ -119,7 +119,6 @@ class VisionModule(pl.LightningModule):
         for n, v in stats.items():
             n = "val_" + n
             self.log(n, v, on_step=False, on_epoch=True, sync_dist=True)
-
 
     def test_step(self, batch, batch_idx, dataset_idx=0):
         x, y = batch
@@ -144,4 +143,3 @@ class VisionModule(pl.LightningModule):
             scheduler["monitor"] = self.monitor
 
         return [optimizer], [scheduler]
-

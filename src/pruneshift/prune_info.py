@@ -35,11 +35,12 @@ def param_size(
     as_bits: bool = False,
 ):
     """ Calculates the size of a parameter in a module."""
+    assert param_name[-5:] != "_orig"
     param = getattr(module, param_name)
     factor = DTYPE2BITS[param.dtype] if as_bits else 1
 
-    if param_name[-5:] == "_orig" and not original:
-        mask = getattr(module, param_name[:-5] + "_mask")
+    if hasattr(module, param_name + "_orig") and not original:
+        mask = getattr(module, param_name + "_mask")
         return int(factor * mask.sum().item())
 
     return int(factor * param.numel())
@@ -59,14 +60,14 @@ class PruneInfo:
 
     def is_target(self, module: nn.Module, param_name: str):
         """ Returns whether a module param pair is a target for pruning."""
-        if param_name[-5:] == "_orig":
-            param_name = param_name[:-5]
         return param_name in self.target_map.get(type(module), [])
 
     def _iter_pairs(self, complete=False):
         """ Iterates over all module, param pairs."""
         for module_name, module in self.network.named_modules():
             for param_name, param in module.named_parameters(recurse=False):
+                if param_name[-5:] == "_orig":
+                    param_name = param_name[: -5]
                 if complete:
                     yield module_name, module, param_name, param
                 else:
@@ -112,21 +113,20 @@ class PruneInfo:
         """ The current compression rate of the network."""
         return self.network_size(True) / self.network_size()
 
-    def summary(self):
+    def summary(self, verbose: bool = False):
         """ Returns a summary of the pruning statistics of the model.
 
-        Adopted from shrinkbench."""
+        Adopted from shrinkbench.
+        """
         rows = []
         for module_name, module, param_name, param in self._iter_pairs(True):
+            if not verbose and not self.is_target(module, param_name):
+                continue
+
             orig_size = param_size(module, param_name, original=True)
             # When the original size was zero the param was only an
             # auxiliarly buffer.
-            if orig_size == 0:
-                continue
             curr_size = param_size(module, param_name)
-
-            if param_name[-5: ] == "_orig":
-                param_name = param_name[:-5]
 
             comp = orig_size / curr_size
             shape = tuple(param.shape)
@@ -144,4 +144,3 @@ class PruneInfo:
             )
         columns = ["module", "param", "comp", "amount", "size", "shape", "target", "protected"]
         return pd.DataFrame(rows, columns=columns)
-

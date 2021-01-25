@@ -53,6 +53,10 @@ class BaseDataModule(pl.LightningDataModule):
         super().__init_subclass__(**kwargs)
         cls.subclasses[cls.name] = cls
 
+    @property
+    def labels(self):
+        return ["clean"]
+
     def create_dataset(self, stage: str, transform=None):
         raise NotImplementedError
 
@@ -265,4 +269,3 @@ class CIFAR100AugmixCModule(AugmixDataModule, CIFAR100CModule):
 
 class ImageNet100AugmixCModule(AugmixDataModule, ImageNet100CModule):
     name = "imagenet100_augmix_corrupted"
-
