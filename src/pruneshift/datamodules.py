@@ -1,6 +1,4 @@
-""" Provides the data modules we need for our experiments.
-
-"""
+""" Provides the data modules we need for our experiments."""
 import logging
 from pathlib import Path
 
@@ -257,13 +255,14 @@ class ImageNet100CModule(CorruptedDataModule, ImageNet100Module):
     corr_dataset_cls = ImageNet100C
 
 
-class CIFAR10AugmixCModule(CIFAR10AugmixModule, CorruptedDataModule):
+class CIFAR10AugmixCModule(AugmixDataModule, CIFAR10CModule):
     name = "cifar10_augmix_corrupted"
 
 
-class CIFAR100AugmixCModule(CIFAR100AugmixModule, CorruptedDataModule):
+class CIFAR100AugmixCModule(AugmixDataModule, CIFAR100CModule):
     name = "cifar100_augmix_corrupted"
 
 
-class ImageNet100AugmixCModule(ImageNet100AugmixModule, CorruptedDataModule):
+class ImageNet100AugmixCModule(AugmixDataModule, ImageNet100CModule):
     name = "imagenet100_augmix_corrupted"
+

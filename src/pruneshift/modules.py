@@ -30,10 +30,10 @@ def standard_loss(network: nn.Module, batch):
     logits = network(x)
     loss = F.cross_entropy(logits, y)
     acc = functional.accuracy(torch.argmax(logits, 1), y)
-    return loss, acc
+    return loss, {"acc": acc} 
 
 
-def augmix_loss(network: nn.Module, batch, alpha: float = 0.0001):
+def augmix_loss(network: nn.Module, batch, alpha: float = 12.):
     """ Loss for the augmix datasets. Adopted from the augmix repository.
 
     Args:
@@ -61,7 +61,9 @@ def augmix_loss(network: nn.Module, batch, alpha: float = 0.0001):
     loss = F.cross_entropy(logits[0], y)
     acc = functional.accuracy(torch.argmax(logits[0], 1), y)
 
-    return loss + alpha * loss_js, acc
+    stats = {"acc": acc, "kl_loss": loss, "augmix_loss": loss_js}
+
+    return loss + loss_js, stats 
 
 
 class VisionModule(pl.LightningModule):
@@ -71,8 +73,8 @@ class VisionModule(pl.LightningModule):
         self,
         network: nn.Module,
         test_labels: Sequence[str] = None,
-        learning_rate: float = 0.0001,
-        augmix_loss_alpha: float = 0.0001,
+        learning_rate: float = 0.1,
+        augmix_loss_alpha: float = 12.,
         optimizer_fn=optim.Adam,
         scheduler_fn=None,
         monitor: str = None,
@@ -101,15 +103,23 @@ class VisionModule(pl.LightningModule):
         else:
             loss_fn = standard_loss
 
-        loss, acc = loss_fn(self, batch)
+        loss, stats = loss_fn(self, batch)
         self.log("train_loss", loss, on_step=False, on_epoch=True, sync_dist=True)
-        self.log("train_acc", acc, on_step=False, on_epoch=True, sync_dist=True)
+
+        for n, v in stats.items():
+            n = "train_" + n
+            self.log(n, v, on_step=False, on_epoch=True, sync_dist=True)
+
         return loss
 
     def validation_step(self, batch, batch_idx):
-        loss, acc = standard_loss(self, batch)
+        loss, stats = standard_loss(self, batch)
         self.log("val_loss", loss, on_step=False, on_epoch=True, sync_dist=True)
-        self.log("val_acc", acc, on_step=False, on_epoch=True, sync_dist=True)
+
+        for n, v in stats.items():
+            n = "val_" + n
+            self.log(n, v, on_step=False, on_epoch=True, sync_dist=True)
+
 
     def test_step(self, batch, batch_idx, dataset_idx=0):
         x, y = batch
@@ -134,3 +144,4 @@ class VisionModule(pl.LightningModule):
             scheduler["monitor"] = self.monitor
 
         return [optimizer], [scheduler]
+

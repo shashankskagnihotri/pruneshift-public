@@ -26,18 +26,12 @@ def oneshot(cfg):
         module = instantiate(cfg.module, network)
     # print("Building gradients...")
     # batch_gradient(module, data)
-   
-    if isinstance(cfg.ratios, int):
-        ratios = [cfg.ratios]
-    else:
-        ratios = cfg.ratios
 
-    for ratio in ratios:
-        logger.info("Pruning the network.")
-        call(cfg.prune, network, ratio=ratio)
-        logger.info("Fine-tuning and testing of the network.")
-        trainer.fit(module, datamodule=data_train)
-        trainer.test(module, datamodule=data_test)
+    logger.info("Pruning the network.")
+    call(cfg.prune, network, ratio=cfg.ratio)
+    logger.info("Fine-tuning and testing of the network.")
+    trainer.fit(module, datamodule=data_train)
+    trainer.test(module, datamodule=data_test)
 
 
 if __name__ == "__main__":
