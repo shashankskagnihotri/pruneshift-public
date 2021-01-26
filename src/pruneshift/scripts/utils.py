@@ -31,7 +31,7 @@ def create_trainer(cfg: DictConfig):
     # Creating a tensorboard and csv logger.
     tb_logger = TensorBoardLogger(path, name="tensorboard", version="")
     csv_logger = CSVLogger(path, name=None, version="")
-    logger = [tb_logger, csv_logger]
+    loggers = [tb_logger, csv_logger]
     callbacks.append(instantiate(cfg.checkpoint))
     # We also want to log the learning rate.
     callbacks.append(LearningRateMonitor("epoch"))
@@ -44,9 +44,8 @@ def create_trainer(cfg: DictConfig):
 
     return instantiate(
         cfg.trainer,
-        logger=logger,
+        logger=loggers,
         callbacks=callbacks,
         deterministic=deterministic,
         weights_save_path=cfg.path.logdir,
     )
-

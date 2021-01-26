@@ -15,3 +15,9 @@ prune:
 # Turn off the weights summary :)
 trainer:
   weights_summary: null
+
+# Currently we only want to loop over ratios.
+hydra:
+    sweep:
+        dir: ${path.logdir}
+        subdir: ratio_${prune.ratio}

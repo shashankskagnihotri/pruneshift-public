@@ -10,6 +10,3 @@ path:
 hydra:
     run:
         dir: ${path.logdir}
-    sweep:
-        dir: ${path.logdir}
-        subdir: ${hydra.job.override_dirname}
