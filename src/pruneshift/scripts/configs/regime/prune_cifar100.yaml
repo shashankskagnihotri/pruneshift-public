@@ -1,39 +1,35 @@
 # @package _global_
 
-# Note that for ddp2 the effective batch_size must be calculated by the number of gpu nodes.
-
 datamodule:
     _target_: pruneshift.datamodules.datamodule
-    name: imagenet100
-    root: ${path.imagenet100}
+    name: cifar100
+    root: ${path.dataset}
     num_workers: 10
-    batch_size: 512 # We need to divide the batch_size by two.
+    batch_size: 128
 
 network:
     _target_: pruneshift.networks.network
-    network_id: "imagenet100_resnet18"
+    network_id: "cifar100_resnet18"
 
 trainer:
     _target_: pytorch_lightning.Trainer
-    max_epochs: 90
-    gpus: 2
-    accelerator: "ddp"
+    max_epochs: 20
+    gpus: 1
     benchmark: True
-    precision: 16
 
 module:
     _target_: pruneshift.modules.VisionModule
-    learning_rate: 0.4
+    learning_rate: 0.001
 
 scheduler:
     _target_: pruneshift.modules.MultiStepWarmUpLr
-    warmup_end: 5
-    milestones: [5, 30, 60, 80]
+    # https://arxiv:org/abs/1708:04552v2:
+    milestones: [10000]
 
 optimizer:
     _target_: torch.optim.SGD
     momentum: 0.9
-    weight_decay: 0.0002
+    weight_decay: 0.0005
     nesterov: True
 
 seed:

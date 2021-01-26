@@ -1,7 +1,7 @@
 defaults:
     - path: standard
     - checkpoint: only_best
-    - regime: cifar10
+    - regime: prune_cifar100
 
 network:
   model_path: ${path.model}
@@ -15,6 +15,3 @@ prune:
 # Turn off the weights summary :)
 trainer:
   weights_summary: null
-
-
-

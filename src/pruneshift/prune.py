@@ -1,7 +1,6 @@
-from typing import Type, Dict, Union
-import logging
+from typing import Type, Dict, Union, Callable
+from functools import partial
 
-import re
 import torch
 from torch import nn as nn
 from torch.nn.utils import prune as prune_torch
@@ -48,10 +47,9 @@ def prune(network: nn.Module, method: str, ratio: float) -> PruneInfo:
         pruning_cls = L1GradUnstructered
         layerwise = True
         raise NotImplementedError
-    elif method == "channels":
-        pruning_cls = prune_torch.LnStructured
+    elif method == "l1_channels":
+        pruning_cls = partial(prune_torch.ln_structured, n=1, dim=0)
         layerwise = True
-        raise NotImplementedError
     elif method == "random":
         pruning_cls = prune_torch.RandomUnstructured
         layerwise = False
@@ -64,9 +62,10 @@ def prune(network: nn.Module, method: str, ratio: float) -> PruneInfo:
 
     return prune_info
 
+
 def simple_prune(
     prune_info: PruneInfo,
-    pruning_method: Union[str, Type[prune_torch.BasePruningMethod]],
+    pruning_method: Union[Callable, Type[prune_torch.BasePruningMethod]],
     layerwise: bool = False,
     **kwargs
 ):
@@ -76,4 +75,8 @@ def simple_prune(
         prune_torch.global_unstructured(pairs, pruning_method, **kwargs)
     else:
         for submodule, param_name in pairs:
+            if not hasattr(pruning_method, "apply"):
+                pruning_method(submodule, param_name, **kwargs)
+                continue
+
             pruning_method.apply(submodule, param_name, **kwargs)

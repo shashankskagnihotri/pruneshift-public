@@ -2,7 +2,6 @@
 
 path:
     logdir: ${env:EXPERIMENT_PATH}/${now:%Y-%m-%d}/${now:%H-%M-%S}
-    config: ${path.logdir}/configs.yaml
     checkpoint: ${path.logdir}/checkpoints/
     dataset: ${env:DATASET_PATH}
     model: ${env:MODEL_PATH}/standard/
@@ -11,3 +10,6 @@ path:
 hydra:
     run:
         dir: ${path.logdir}
+    sweep:
+        dir: ${path.logdir}
+        subdir: ${hydra.job.override_dirname}

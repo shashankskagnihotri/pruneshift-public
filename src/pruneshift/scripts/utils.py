@@ -1,5 +1,6 @@
 from functools import partial
 from pathlib import Path
+import logging
 
 from hydra.utils import instantiate
 from omegaconf import DictConfig, OmegaConf
@@ -8,9 +9,11 @@ from pytorch_lightning.loggers import TensorBoardLogger
 from pytorch_lightning.loggers import CSVLogger
 from pytorch_lightning.callbacks import LearningRateMonitor
 
+logger = logging.getLogger(__name__)
+
 
 def save_config(cfg: DictConfig):
-    with open(cfg.path.config, "w") as file:
+    with open(Path.cwd()/"configs.yaml", "w") as file:
         file.write(OmegaConf.to_yaml(cfg))
 
 
@@ -22,7 +25,8 @@ def create_optim(cfg: DictConfig):
 
 def create_trainer(cfg: DictConfig):
     """ Creates a `pl.Trainer` for our experiment setup."""
-    path = Path(cfg.path.logdir)
+    path = Path.cwd()
+    logger.info(f"Save everything into {path}")
     callbacks = []
     # Creating a tensorboard and csv logger.
     tb_logger = TensorBoardLogger(path, name="tensorboard", version="")

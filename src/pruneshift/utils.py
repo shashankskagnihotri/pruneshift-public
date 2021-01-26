@@ -7,7 +7,8 @@ import torch
 
 
 def load_state_dict(path: Union[str, Path]):
-    state_dict = torch.load(path)
+    """ Loads a state_dict """
+    state_dict = torch.load(path, map_location=lambda storage, loc: storage)
 
     if "state_dict" not in state_dict:
         return state_dict
