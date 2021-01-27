@@ -77,6 +77,7 @@ class VisionModule(pl.LightningModule):
         optimizer_fn=optim.Adam,
         scheduler_fn=None,
         monitor: str = None,
+        hparams = None,
     ):
 
         super(VisionModule, self).__init__()
@@ -86,6 +87,8 @@ class VisionModule(pl.LightningModule):
         self.optimizer_fn = optimizer_fn
         self.scheduler_fn = scheduler_fn
         self.monitor = monitor
+
+        self.hparams = {} if hparams is None else hparams
 
         if test_labels is None:
             self.test_labels = ["acc"]
@@ -115,10 +118,10 @@ class VisionModule(pl.LightningModule):
     def validation_step(self, batch, batch_idx):
         loss, stats = standard_loss(self, batch)
         self.log("val_loss", loss, on_step=False, on_epoch=True, sync_dist=True)
-
         for n, v in stats.items():
             n = "val_" + n
-            self.log(n, v, on_step=False, on_epoch=True, sync_dist=True)
+            prog_bar = True if n == "val_acc" else False
+            self.log(n, v, on_step=False, on_epoch=True, prog_bar=prog_bar, sync_dist=True)
 
     def test_step(self, batch, batch_idx, dataset_idx=0):
         x, y = batch

@@ -9,6 +9,15 @@ from torch.nn.utils import prune as prune_torch
 from .prune_info import PruneInfo
 
 
+class MaskShuffel(prune_torch.L1Unstructured):
+
+    def compute_mask(self):
+        mask = super(MaskShuffel, self).compute_mask()
+        idx = torch.randperm(mask.numel())
+        return mask.view(-1)[idx].view(mask.size())
+        
+
+
 class L1GradUnstructered(prune_torch.L1Unstructured):
     """
     Examples:
@@ -19,6 +28,8 @@ class L1GradUnstructered(prune_torch.L1Unstructured):
     """
     def compute_mask(self, t, default_mask):
         return super(L1GradUnstructered, self).compute_mask(t.grad, default_mask)
+
+
 
 
 def prune(network: nn.Module, method: str, ratio: float) -> PruneInfo:
@@ -34,9 +45,15 @@ def prune(network: nn.Module, method: str, ratio: float) -> PruneInfo:
         Returns info about the pruning.
     """
 
+    shuffle = False
+
     if method == "global_weight":
         pruning_cls = prune_torch.L1Unstructured
         layerwise = False
+    elif method == "global_weight_shuffle":
+        pruning_cls = prune_torch.L1Unstructured
+        layerwise = False
+        shuffle = True
     elif method == "layer_weight":
         pruning_cls = prune_torch.L1Unstructured
         layerwise = True
@@ -60,7 +77,18 @@ def prune(network: nn.Module, method: str, ratio: float) -> PruneInfo:
     amount = prune_info.ratio_to_amount(ratio)
     simple_prune(prune_info, pruning_cls, layerwise, amount=amount)
 
+    if shuffle:
+        shuffle_masks(prune_info)
+
     return prune_info
+
+
+def shuffle_masks(prune_info: PruneInfo):
+    for module, param_name in prune_info.target_pairs():
+        mask = getattr(module, param_name + "_mask")
+        idx = torch.randperm(mask.numel())
+        shuffled_mask = mask.view(-1)[idx].view(mask.size())
+        setattr(module, param_name + "_mask", shuffled_mask)
 
 
 def simple_prune(
@@ -80,3 +108,4 @@ def simple_prune(
                 continue
 
             pruning_method.apply(submodule, param_name, **kwargs)
+

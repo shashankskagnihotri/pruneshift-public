@@ -5,7 +5,6 @@ import torch.nn.utils.prune as torch_prune
 import torch.nn as nn
 import torch
 
-
 def load_state_dict(path: Union[str, Path]):
     """ Loads a state_dict """
     state_dict = torch.load(path, map_location=lambda storage, loc: storage)

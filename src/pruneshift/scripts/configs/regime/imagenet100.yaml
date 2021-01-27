@@ -7,7 +7,7 @@ datamodule:
     name: imagenet100
     root: ${path.imagenet100}
     num_workers: 10
-    batch_size: 512 # We need to divide the batch_size by two.
+    batch_size: 64 # We need to divide the batch_size by two.
 
 network:
     _target_: pruneshift.networks.network
@@ -16,7 +16,7 @@ network:
 trainer:
     _target_: pytorch_lightning.Trainer
     max_epochs: 90
-    gpus: 2
+    gpus: 4
     accelerator: "ddp"
     benchmark: True
     precision: 16

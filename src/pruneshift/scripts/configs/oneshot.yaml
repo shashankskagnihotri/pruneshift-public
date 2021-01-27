@@ -4,17 +4,18 @@ defaults:
     - regime: prune_cifar100
 
 network:
-  model_path: ${path.model}
-  version: 0
+    model_path: ${path.model}
+    version: 0
 
 prune:
-  _target_: pruneshift.prune.prune
-  method: global_weight
-  ratio: 2
+    _target_: pruneshift.prune.prune
+    method: global_weight
+    ratio: 2
 
 # Turn off the weights summary :)
 trainer:
-  weights_summary: null
+    weights_summary: null
+
 
 # Currently we only want to loop over ratios.
 hydra:
