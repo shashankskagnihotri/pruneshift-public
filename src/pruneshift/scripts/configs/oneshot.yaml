@@ -12,6 +12,8 @@ prune:
     method: global_weight
     ratio: 2
 
+prune_n: 1
+
 # Turn off the weights summary :)
 trainer:
     weights_summary: null

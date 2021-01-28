@@ -23,10 +23,8 @@ def oneshot(cfg):
 
     module = instantiate(cfg.module, network, data.labels, **optim_args)
 
-    ratios = cfg.prune.ratio
-
-    if isinstance(ratios, (int, float)):
-        ratios = [ratios]
+    ratios = [cfg.prune.ratio for _ in range(1, cfg.prune_n + 1)]
+    logger.info(f"Iterating over the following ratios {ratios}")
 
     for ratio in ratios:
         logger.info("Starting with pruning...")
