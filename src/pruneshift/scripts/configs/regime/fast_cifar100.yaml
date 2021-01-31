@@ -19,7 +19,7 @@ trainer:
     benchmark: True
 
 module:
-    _target_: pruneshift.modules.VisionModule
+    # _target_: pruneshift.modules.VisionModule
     learning_rate: 0.1
 
 scheduler:
@@ -34,4 +34,4 @@ optimizer:
     nesterov: True
 
 seed:
-    seed: None
+    seed: 0

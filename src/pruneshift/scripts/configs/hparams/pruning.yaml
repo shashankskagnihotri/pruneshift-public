@@ -1,7 +1,0 @@
-# @package hparams
-
-data: ${datamodule.name}
-model: ${network.model_path}
-prune_method: ${prune.method}
-prune_ratio: ${prune.ratio}
-

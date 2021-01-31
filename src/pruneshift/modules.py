@@ -1,15 +1,26 @@
 from bisect import bisect_right
-from typing import Sequence
 from functools import partial
+import logging
+from typing import Sequence
+from typing import Callable
+
 
 import pytorch_lightning as pl
 from pytorch_lightning.metrics import Accuracy
 from pytorch_lightning.metrics import functional
 import torch
 import torch.nn as nn
+from torch.nn.utils.prune import is_pruned
 import torch.optim as optim
 from torch.optim.lr_scheduler import LambdaLR
 from torch.nn import functional as F
+
+from pruneshift.hydra import hydrate
+from pruneshift.hydra import dehydrate
+
+
+logger = logging.getLogger(__name__)
+
 
 
 class MultiStepWarmUpLr(LambdaLR):
@@ -77,7 +88,6 @@ class VisionModule(pl.LightningModule):
         optimizer_fn=optim.Adam,
         scheduler_fn=None,
         monitor: str = None,
-        hparams = None,
     ):
 
         super(VisionModule, self).__init__()
@@ -87,8 +97,6 @@ class VisionModule(pl.LightningModule):
         self.optimizer_fn = optimizer_fn
         self.scheduler_fn = scheduler_fn
         self.monitor = monitor
-
-        self.hparams = {} if hparams is None else hparams
 
         if test_labels is None:
             self.test_labels = ["acc"]
@@ -146,3 +154,79 @@ class VisionModule(pl.LightningModule):
             scheduler["monitor"] = self.monitor
 
         return [optimizer], [scheduler]
+
+
+class PrunedModule(VisionModule):
+    def __init__(
+        self,
+        network: nn.Module,
+        prune_fn: Callable,
+        test_labels: Sequence[str] = None,
+        learning_rate: float = 0.1,
+        augmix_loss_alpha: float = 12.,
+        optimizer_fn=optim.Adam,
+        scheduler_fn=None,
+        monitor: str = None,
+    ):
+        super(PrunedModule, self).__init__(network=network,
+                                           test_labels=test_labels,
+                                           learning_rate=learning_rate,
+                                           augmix_loss_alpha=augmix_loss_alpha,
+                                           optimizer_fn=optimizer_fn,
+                                           scheduler_fn=scheduler_fn,
+                                           monitor=monitor)
+
+        self.prune_fn = prune_fn 
+
+    def setup(self, stage: str):
+        if is_pruned(self.network):
+            return
+
+        info = self.prune_fn(self.network)
+        self.print(f"\n {info.summary()}")
+
+
+class HydraModule(VisionModule):
+    def __init__(
+        self,
+        network: nn.Module,
+        ratio: float,
+        T_max: int = 200,
+        T_prune_end: int = 30,
+        test_labels: Sequence[str] = None,
+        learning_rate: float = 0.1,
+        augmix_loss_alpha: float = 12.,
+        optimizer_fn=optim.Adam,
+        scheduler_fn=None,
+    ):
+        # TODO: We currently only support training with schedulers.
+        assert scheduler_fn is not None
+        super(HydraModule, self).__init__(network=network,
+                                          test_labels=test_labels,
+                                          learning_rate=learning_rate,
+                                          augmix_loss_alpha=augmix_loss_alpha,
+                                          optimizer_fn=None,
+                                          scheduler_fn=None,
+                                          monitor=None)
+
+        self.ratio = ratio
+        self.T_prune_end = T_prune_end
+
+    def setup(self, stage: str):
+        if stage != "fit":
+            return
+
+        hydrate(self.network, self.ratio)
+        
+
+    def on_train_epoch_start(self):
+        if self.trainer.current_epoch == self.T_prune_end:
+            dehydrate(self.network)
+           
+            optimizers, lr_schedulers = self.configure_optimizers()
+            self.trainer.optimizers = optimizers
+            self.trainer.lr_schedulers = lr_schedulers
+
+    def configure_optimizers(self, step_shift=None):
+        pass 
+

@@ -46,6 +46,15 @@ def param_size(
     return int(factor * param.numel())
 
 
+def flops(
+    module: nn.Module,
+    param_name: str = None
+):
+    """ Calculates flops and theoretical flops of a module."""
+    
+    pass
+
+
 DEFAULT_TARGETS = {nn.Linear: ["weight", "bias"], nn.Conv2d: ["weight", "bias"]}
 
 
@@ -68,6 +77,8 @@ class PruneInfo:
             for param_name, param in module.named_parameters(recurse=False):
                 if param_name[-5:] == "_orig":
                     param_name = param_name[: -5]
+                if param_name[-6:] == "_score":
+                    param_name = param_name[: -6]
                 if complete:
                     yield module_name, module, param_name, param
                 else:

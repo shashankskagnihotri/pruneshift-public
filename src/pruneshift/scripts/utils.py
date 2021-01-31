@@ -17,6 +17,10 @@ def save_config(cfg: DictConfig):
         file.write(OmegaConf.to_yaml(cfg))
 
 
+def partial_instantiate(cfg):
+    return partial(instantiate, cfg)
+
+
 def create_optim(cfg: DictConfig):
     """ Creates factory functions regarding optimization."""
     return {"optimizer_fn": partial(instantiate, cfg.optimizer),
@@ -36,11 +40,13 @@ def create_trainer(cfg: DictConfig):
     # We also want to log the learning rate.
     callbacks.append(LearningRateMonitor("epoch"))
 
-    if cfg.seed.seed is None:
-        deterministic = False
-    else:
-        pl.seed_everything(cfg.seed.seed)
-        deterministic = True
+    if not isinstance(cfg.seed.seed, int):
+        msg = "Found no viable seed. A seed must be given by the user otherwise "\
+              "backends like ddp will be buggy with random pruning strategies."
+        raise RuntimeError(msg)
+
+    pl.seed_everything(cfg.seed.seed)
+    deterministic = True
 
     return instantiate(
         cfg.trainer,
@@ -49,3 +55,4 @@ def create_trainer(cfg: DictConfig):
         deterministic=deterministic,
         weights_save_path=cfg.path.logdir,
     )
+

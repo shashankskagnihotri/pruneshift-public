@@ -284,3 +284,4 @@ def resnext101_32x8d(pretrained=False, progress=True, device='cpu', **kwargs):
     kwargs['width_per_group'] = 8
     return _resnet('resnext101_32x8d', Bottleneck, [3, 4, 23, 3],
                    pretrained, progress, device, **kwargs)
+
