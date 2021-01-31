@@ -222,11 +222,25 @@ class HydraModule(VisionModule):
     def on_train_epoch_start(self):
         if self.trainer.current_epoch == self.T_prune_end:
             dehydrate(self.network)
-           
+ 
             optimizers, lr_schedulers = self.configure_optimizers()
             self.trainer.optimizers = optimizers
             self.trainer.lr_schedulers = lr_schedulers
 
-    def configure_optimizers(self, step_shift=None):
-        pass 
+    def configure_optimizers(self, step_shift=0):
+
+        if self.optimizer_fn is None:
+            return
+
+        optimizer = self.optimizer_fn(self.parameters(), lr=self.learning_rate)
+
+        if self.scheduler_fn is None:
+            return optimizer
+
+        scheduler = {"scheduler": self.scheduler_fn(optimizer)}
+
+        if self.monitor is not None:
+            scheduler["monitor"] = self.monitor
+
+        return [optimizer], [scheduler]
 
