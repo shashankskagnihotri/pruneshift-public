@@ -1,6 +1,18 @@
-
 defaults:
-    - path: standard
     - checkpoint: only_best
-    - regime: cifar10
+    - path: standard
+    - loss: standard
+    - network: pretrained
+    - trainer: standard
+    - scheduler: cosine
+    - optimizer: sgd
+    - datamodule: cifar100
+
+seed: 1234
+
+# Currently we only want to loop over ratios.
+# hydra:
+#     sweep:
+#         dir: ${path.logdir}
+#         subdir: ratio_${prune.ratio}
 

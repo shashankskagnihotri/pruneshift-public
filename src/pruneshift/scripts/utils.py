@@ -17,6 +17,17 @@ def save_config(cfg: DictConfig):
         file.write(OmegaConf.to_yaml(cfg))
 
 
+def check_batch_size(cfg: DictConfig, trainer: pl.Trainer):
+    if not cfg.trainer.accelerator == "ddp":
+        logger.info("Batch size seems fine!")
+        return
+
+    old_batch_size = cfg.datamodule.batch_size
+    new_batch_size = old_batch_size // trainer.num_gpus 
+    logger.info(f"Change the batch size from {old_batch_size} to {new_batch_size}.") 
+    cfg.datamodule.batch_size = new_batch_size
+
+
 def partial_instantiate(cfg):
     return partial(instantiate, cfg)
 
@@ -40,19 +51,24 @@ def create_trainer(cfg: DictConfig):
     # We also want to log the learning rate.
     callbacks.append(LearningRateMonitor("epoch"))
 
-    if not isinstance(cfg.seed.seed, int):
+    if not isinstance(cfg.seed, int):
         msg = "Found no viable seed. A seed must be given by the user otherwise "\
               "backends like ddp will be buggy with random pruning strategies."
         raise RuntimeError(msg)
 
-    pl.seed_everything(cfg.seed.seed)
+    pl.seed_everything(cfg.seed)
     deterministic = True
 
-    return instantiate(
+    trainer = instantiate(
         cfg.trainer,
         logger=loggers,
         callbacks=callbacks,
         deterministic=deterministic,
         weights_save_path=cfg.path.logdir,
     )
+
+    # Check if we need to correct the batch_size.
+    check_batch_size(cfg, trainer)
+
+    return trainer
 

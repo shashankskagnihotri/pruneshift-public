@@ -1,0 +1,9 @@
+# @package _global_
+
+scheduler:
+    _target_: pruneshift.modules.MultiStepWarmUpLr
+    milestones: [91, 136]
+
+trainer:
+    max_epochs: 182 
+

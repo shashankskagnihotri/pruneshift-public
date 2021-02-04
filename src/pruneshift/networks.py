@@ -40,19 +40,25 @@ def protect_classifier(name: str, network: nn.Module):
 def load_checkpoint(
     network: nn.Module,
     network_id: str,
-    model_path: str,
+    ckpt_path: str = None,
+    model_path: str = None,
     version: int = None
 ):
     """Loads a checkpoint."""
-    version = 0 if version is None else version
-    path = Path(model_path) / f"{network_id}.{version}"
+
+    if ckpt_path is not None:
+        path = Path(ckpt_path)
+    else:
+        version = 0 if version is None else version
+        path = Path(model_path) / f"{network_id}.{version}"
     state = load_state_dict(path)
     network.load_state_dict(state)
 
 
-def network(
+def create_network(
     network_id: str,
     download: bool = False,
+    ckpt_path: str = None,
     model_path: str = None,
     version: int = None,
     **kwargs
@@ -62,6 +68,7 @@ def network(
     Args:
         network_id: For example cifar10_resnet50.
         download: Can only be True for imagenet models.
+        ckpt_path: Direct path o a checkpoint of a network.
         model_path: Directory to find checkpoints in.
         version: Version of the checkpoint.
     Returns:
@@ -85,8 +92,6 @@ def network(
     if group == "cifar":
         if download:
             raise RuntimeError("Can not download trained Cifar models.")
-        # if name[: 6] == "resnet":
-        #     network_fn = getattr(resnet_cifar_models, name)
         network_fn = getattr(cifar_models, name)
     elif group == "imagenet":
         network_fn = getattr(imagenet_models, name)
@@ -95,8 +100,8 @@ def network(
 
     network = network_fn(pretrained=download, num_classes=num_classes, **kwargs)
 
-    if not download and model_path is not None:
-        load_checkpoint(network, network_id, model_path, version)
+    if not download and (ckpt_path is not None or model_path is not None):
+        load_checkpoint(network, network_id, ckpt_path, model_path, version)
 
     # We also want to have the classifier protected from pruning.
     protect_classifier(name, network) 

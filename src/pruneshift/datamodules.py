@@ -30,6 +30,7 @@ def datamodule(
     Returns:
         The corresponding LightningDataModule.
     """
+    logger.info(f"Creating datamodule {name}.")
     return BaseDataModule.subclasses[name](root, batch_size, num_workers, **kwargs)
 
 
@@ -269,3 +270,4 @@ class CIFAR100AugmixCModule(AugmixDataModule, CIFAR100CModule):
 
 class ImageNet100AugmixCModule(AugmixDataModule, ImageNet100CModule):
     name = "imagenet100_augmix_corrupted"
+

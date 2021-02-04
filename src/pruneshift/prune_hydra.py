@@ -101,7 +101,8 @@ def hydrate(network: nn.Module, ratio: float, init: str = None):
 def dehydrate(network: nn.Module):
     """ Changes the hydrated network to a normal pruned network."""
     # Collects modules, param_names and mask from the hooks.
-    info = PruneInfo(network, {nn.Linear: ["weight"], nn.Conv2d: ["weight"]})
+    info = PruneInfo(network, {nn.Linear: ["weight", "bias"],
+                               nn.Conv2d: ["weight"]})
 
 
     for module in network.modules():

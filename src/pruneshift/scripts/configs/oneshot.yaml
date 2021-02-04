@@ -1,26 +1,26 @@
 defaults:
-    - path: standard
     - checkpoint: only_best
-    - regime: prune_cifar100
-
-network:
-    model_path: ${path.model}
-    version: 0
+    - path: standard
+    - loss: standard
+    - network: pretrained
+    - trainer: standard
+    - scheduler: cosine
+    - optimizer: sgd
+    - datamodule: cifar100
 
 prune:
-    _target_: pruneshift.prune.prune
     method: global_weight
     ratio: 2
 
-prune_n: 1
-
-# Turn off the weights summary :)
 trainer:
     weights_summary: null
+    max_epochs: 30
 
+seed: 1234
 
 # Currently we only want to loop over ratios.
 hydra:
     sweep:
         dir: ${path.logdir}
         subdir: ratio_${prune.ratio}
+
