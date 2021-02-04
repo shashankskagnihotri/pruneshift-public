@@ -7,9 +7,10 @@
 
 
 
-To do oneshot pruning with a normal run on cifar100 with a corrupted testset:
+To do oneshot pruning with a normal run on cifar100 with a corrupted testset do:
+Standard settings are `global_weight` with a ratio of `2`:
 ```
-ps_oneshot
+ps_oneshot prune.method=l1_channels prune.ratio=16
 ```
 To do oneshot pruning with a specific checkpointed network with cifar100 augmix and corrupted test set:
 ```
