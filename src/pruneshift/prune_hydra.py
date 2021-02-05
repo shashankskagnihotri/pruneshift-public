@@ -82,7 +82,7 @@ def freeze_protected(info, reverse: bool = False):
             param.requires_grad = reverse
 
             
-def hydrate(network: nn.Module, ratio: float, init: str = None):
+def hydrate(network: nn.Module, ratio: float):
     """ Prunes a model and prepare it for the hydra pruning phase."""
     info = PruneInfo(network, {nn.Linear: ["weight"], nn.Conv2d: ["weight"]})
 

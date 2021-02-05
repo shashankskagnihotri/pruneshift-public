@@ -1,3 +1,5 @@
 # @package _group_
 
 _target_: pruneshift.losses.AugmixLoss
+alpha: 12.
+beta: 1.

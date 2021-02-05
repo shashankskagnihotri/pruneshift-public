@@ -16,8 +16,6 @@ import torch.optim as optim
 from torch.optim.lr_scheduler import LambdaLR
 from torch.nn import functional as F
 
-from pruneshift.prune_hydra import hydrate
-from pruneshift.prune_hydra import dehydrate
 from pruneshift.losses import StandardLoss
 
 

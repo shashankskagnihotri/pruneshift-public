@@ -18,7 +18,7 @@ class StandardLoss(nn.Module):
 
 class AugmixLoss(nn.Module):
 
-    def __init__(self, alpha: float = 12.):
+    def __init__(self, alpha: float = 12., beta: float = 1.):
         """ Implements the AugmixLoss from the augmix paper.
 
         Args:
@@ -26,6 +26,7 @@ class AugmixLoss(nn.Module):
         """ 
         super(AugmixLoss, self).__init__()
         self.alpha = alpha
+        self.beta = beta 
 
 
     def forward(self, network: nn.Module, batch):
@@ -45,10 +46,11 @@ class AugmixLoss(nn.Module):
                    F.kl_div(p_mixture, p_aug2, reduction='batchmean')) / 3.
         loss_js *= self.alpha
 
-        loss = F.cross_entropy(logits[0], y)
+        loss = self.beta * F.cross_entropy(logits[0], y)
         acc = accuracy(torch.argmax(logits[0], 1), y)
     
         stats = {"acc": acc, "kl_loss": loss, "augmix_loss": loss_js}
     
         return loss + loss_js, stats 
+
 

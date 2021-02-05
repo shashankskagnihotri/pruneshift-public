@@ -17,7 +17,6 @@ class MaskShuffel(prune_torch.L1Unstructured):
         return mask.view(-1)[idx].view(mask.size())
         
 
-
 class L1GradUnstructered(prune_torch.L1Unstructured):
     """
     Examples:
@@ -28,8 +27,6 @@ class L1GradUnstructered(prune_torch.L1Unstructured):
     """
     def compute_mask(self, t, default_mask):
         return super(L1GradUnstructered, self).compute_mask(t.grad, default_mask)
-
-
 
 
 def prune(network: nn.Module, method: str, ratio: float) -> PruneInfo:

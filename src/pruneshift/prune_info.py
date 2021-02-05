@@ -155,3 +155,4 @@ class PruneInfo:
             )
         columns = ["module", "param", "comp", "amount", "size", "shape", "target", "protected"]
         return pd.DataFrame(rows, columns=columns)
+
