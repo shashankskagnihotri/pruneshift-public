@@ -115,7 +115,7 @@ class ResNet(nn.Module):
     	feat_m = nn.ModuleList([])
     	feat_m.append(self.conv1)
     	feat_m.append(self.bn1)
-    	feat_m.append(F.relu(self.bn1(self.conv1(x))))
+    	feat_m.append(nn.ReLU(self.bn1(self.conv1(x))))
     	feat_m.append(self.layer1)
     	feat_m.append(self.layer2)
     	feat_m.append(self.layer3)
