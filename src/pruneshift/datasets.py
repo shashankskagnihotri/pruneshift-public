@@ -197,3 +197,4 @@ class ImageNet100C:
     def lvl_subsets(self):
         path = Path(self.root) / self.distortion
         return [ImageFolder(path / str(i), self.transform) for i in range(1, 6)]
+

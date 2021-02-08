@@ -99,8 +99,19 @@ class VisionModule(pl.LightningModule):
         self.test_acc[self.test_labels[dataset_idx]](y, torch.argmax(self(x), -1))
 
     def test_epoch_end(self, outputs):
+        values = {}
+
         for label, metric in self.test_acc.items():
-            self.log(f"test_{label}", metric.compute())
+            values[f"test_{label}"] = metric.compute()
+
+        self.log_dict(values)
+
+        if len(values) <= 1:
+            return
+
+        # Caluclate the mean corruption error.
+        non_clean = [acc for l, acc in values.items() if l != "test_acc_clean"]
+        self.log("test_mCE", 1 - torch.tensor(non_clean).mean()) 
 
     def configure_optimizers(self):
         if self.optimizer_fn is None:

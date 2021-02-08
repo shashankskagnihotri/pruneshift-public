@@ -41,7 +41,11 @@ def datamodule(
     """
     logger.info(f"Creating datamodule {name}.")
     return BaseDataModule.subclasses[name](
-        root, batch_size, num_workers, val_split=val_split, **kwargs
+        root=root,
+        batch_size=batch_size,
+        num_workers=num_workers,
+        val_split=val_split,
+        **kwargs
     )
 
 
@@ -57,6 +61,7 @@ class BaseDataModule(pl.LightningDataModule):
         num_workers: int,
         val_split: float,
         with_normalize: bool = True,
+        **kwargs,
     ):
         super(BaseDataModule, self).__init__()
         self.root = root
@@ -127,12 +132,17 @@ class BaseDataModule(pl.LightningDataModule):
 
 
 class AugmixDataModule(BaseDataModule):
+    def __init__(self, no_jsd=False, **kwargs):
+        super(AugmixDataModule, self).__init__(**kwargs)
+        self.no_jsd = no_jsd
+
+
     def create_dataset(self, mode: str, transform=None):
         if mode == "test":
             return super(AugmixDataModule, self).create_dataset(mode, transform)
 
         datasets = super(AugmixDataModule, self).create_dataset(mode, transform)
-        train_dataset = AugMixWrapper(datasets[0], self.normalizer())
+        train_dataset = AugMixWrapper(datasets[0], self.normalizer(), no_jsd=self.no_jsd)
 
         return train_dataset, datasets[1]
 
@@ -155,17 +165,9 @@ class CorruptedDataModule(BaseDataModule):
 
     corr_dataset_cls = None
 
-    def __init__(
-        self,
-        root: str,
-        batch_size: int,
-        num_workers: int,
-        lvls=None,
-        with_normalize: bool = True,
-    ):
-        super(CorruptedDataModule, self).__init__(
-            root, batch_size, num_workers, with_normalize
-        )
+    def __init__(self, lvls=None, **kwargs):
+        super(CorruptedDataModule, self).__init__(**kwargs)
+
         self.lvls = range(1, 6) if lvls is None else lvls
 
     def prepare_data(self):

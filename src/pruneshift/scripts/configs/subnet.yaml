@@ -12,6 +12,7 @@ hydrate:
     ratio: 32
 
 trainer:
+    max_epochs: 10
     weights_summary: null
 
 seed: 1234

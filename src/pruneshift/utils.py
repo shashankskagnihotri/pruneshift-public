@@ -32,10 +32,13 @@ def load_pruned_state_dict(network: nn.Module, path: Union[str, Path]):
 
     # 2. Find all params that need to be pruned.
     for param_name, param in list(network.named_parameters()):
-        if param_name in state_dict:
-            continue
-        elif param_name + "_orig" in state_dict:
-            # TODO: This is probably wrong and can be simplified.
+        if param_name + "_orig" in state_dict:
+            # If the checkpoint was from hydra delete the scores.
+            del state_dict[param_name]
+
+            if param_name + "_score" in state_dict:
+                del state_dict[param_name + "_score"]
+
             idx = param_name.rfind(".")
             module_name, param_name = param_name[:idx], param_name[idx + 1 :]
             module = network
@@ -43,8 +46,9 @@ def load_pruned_state_dict(network: nn.Module, path: Union[str, Path]):
                 module = getattr(module, submodule_name)
             # Prune with identity so we can load into the pruning sheme.
             torch_prune.identity(module, param_name)
-        else:
-            raise ValueError("Checkpoints might be not compatible.")
+
+        elif not param_name in state_dict:
+            raise ValueError(f"Missing {param_name}.")
 
     network.load_state_dict(state_dict)
     return network
