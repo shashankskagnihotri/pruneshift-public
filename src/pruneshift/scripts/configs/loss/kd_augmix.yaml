@@ -1,0 +1,9 @@
+# @package _group_
+
+_target_: pruneshift.losses.KnowledgeDistill
+alpha: 12.
+beta: 0.1
+kd_T: 4.
+charlie: 0.9
+teacher_path: ($path.model)
+teacher_model_id: cifar100_resnet18
