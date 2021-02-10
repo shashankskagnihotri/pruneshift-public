@@ -171,7 +171,7 @@ class CIFAR100C(CIFAR10C):
 
 
 class ImageNet100C:
-    corruptions = [
+    distortions_list = [
         "brightness",
         "contrast",
         "defocus_blur",

@@ -1,6 +1,7 @@
 """ Provides the data modules we need for our experiments."""
 
 import logging
+from typing import Optional
 from pathlib import Path
 
 from torch.utils.data import DataLoader
@@ -26,7 +27,7 @@ def datamodule(
     root: str,
     batch_size: int = 32,
     num_workers: int = 5,
-    val_split: float = 0.2,
+    val_split: Optional[float] = None,
     **kwargs,
 ) -> pl.LightningDataModule:
     """Creates a LightningDataModule.
@@ -36,6 +37,7 @@ def datamodule(
         batch_size: The batch size used for the datamodule.
         num_workers: Number of workers used for the dataloaders.
         val_split: Amount of samples that should be used for the validation set.
+            If None the test set becomes the validation set.
     Returns:
         The corresponding LightningDataModule.
     """
@@ -59,7 +61,7 @@ class BaseDataModule(pl.LightningDataModule):
         root: str,
         batch_size: int,
         num_workers: int,
-        val_split: float,
+        val_split: Optional[float],
         with_normalize: bool = True,
         **kwargs,
     ):
@@ -211,19 +213,24 @@ class CIFAR10Module(BaseDataModule):
 
     def create_dataset(self, stage: str, transform=None):
         if stage == "fit":
-            dataset = self.cifar_cls(self.root, True)
-            split_point = int(len(dataset) * self.val_split)
-            val_dataset = Subset(dataset, range(split_point))
-            train_dataset = Subset(dataset, range(split_point, len(dataset)))
-            train_dataset = TransformWrapper(train_dataset, transform[0])
-            val_dataset = TransformWrapper(val_dataset, transform[1])
-            return train_dataset, val_dataset
+            if self.val_split is not None:
+                dataset = self.cifar_cls(self.root, True)
+                split_point = int(len(dataset) * self.val_split)
+                val_dataset = Subset(dataset, range(split_point))
+                train_dataset = Subset(dataset, range(split_point, len(dataset)))
+                train_dataset = TransformWrapper(train_dataset, transform[0])
+                val_dataset = TransformWrapper(val_dataset, transform[1])
+                return train_dataset, val_dataset
+            else:
+                train_dataset = self.cifar_cls(self.root, True, transform[0])
+                val_dataset = self.cifar_cls(self.root, False, transform[1])
+                return train_dataset, val_dataset
 
         return [self.cifar_cls(self.root, False, transform)]
 
     def preprocessor(self, train: bool = True):
         if not train:
-            return lambda x: x
+            return None 
 
         return transforms.Compose(
             [
@@ -250,11 +257,16 @@ class ImageNet100Module(BaseDataModule):
 
     def create_dataset(self, stage: str, transform=None):
         if stage == "fit":
-            dataset = SplitImageFolder(Path(self.root) / "train")
-            val_dataset, train_dataset = dataset.split(self.val_split)
-            train_dataset = TransformWrapper(train_dataset, transform[0])
-            val_dataset = TransformWrapper(val_dataset, transform[1])
-            return train_dataset, val_dataset
+            if self.val_split is not None:
+                dataset = SplitImageFolder(Path(self.root) / "train")
+                val_dataset, train_dataset = dataset.split(self.val_split)
+                train_dataset = TransformWrapper(train_dataset, transform[0])
+                val_dataset = TransformWrapper(val_dataset, transform[1])
+                return train_dataset, val_dataset
+            else:
+                train_dataset = ImageFolder(Path(self.root) / "train", transform=transform[0])
+                val_dataset = ImageFolder(Path(self.root) / "val", transform=transform[1])
+                return train_dataset, val_dataset
 
         return [ImageFolder(Path(self.root) / "val", transform)]
 
@@ -308,3 +320,4 @@ class CIFAR100AugmixCModule(AugmixDataModule, CIFAR100CModule):
 
 class ImageNet100AugmixCModule(AugmixDataModule, ImageNet100CModule):
     name = "imagenet100_augmix_corrupted"
+

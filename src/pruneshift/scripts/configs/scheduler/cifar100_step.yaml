@@ -4,6 +4,7 @@
 scheduler:
     _target_: pruneshift.modules.MultiStepWarmUpLr
     milestones: [60, 120, 160]
+    gamma: 0.2
 
 trainer:
     max_epochs: 200

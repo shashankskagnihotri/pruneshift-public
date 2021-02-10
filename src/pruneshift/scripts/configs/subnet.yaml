@@ -1,5 +1,5 @@
 defaults:
-    - checkpoint: only_best
+    - checkpoint: last
     - path: standard
     - loss: standard
     - network: pretrained

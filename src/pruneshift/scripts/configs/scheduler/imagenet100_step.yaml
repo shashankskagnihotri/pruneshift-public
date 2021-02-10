@@ -3,8 +3,10 @@
 scheduler:
     _target_: pruneshift.modules.MultiStepWarmUpLr
     warmup_end: 5
-    milestones: [5, 30, 60, 80]
+    milestones: [30, 60, 80]
 
 trainer:
     max_epochs: 90
 
+optimizer:
+    lr: 0.4

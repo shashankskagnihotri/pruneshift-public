@@ -1,8 +1,8 @@
 defaults:
-    - checkpoint: only_best
+    - checkpoint: last 
     - path: standard
     - loss: standard
-    - network: pretrained
+    - network: standard
     - trainer: standard
     - scheduler: cosine
     - optimizer: sgd
@@ -15,4 +15,5 @@ seed: 1234
 #     sweep:
 #         dir: ${path.logdir}
 #         subdir: ratio_${prune.ratio}
+
 

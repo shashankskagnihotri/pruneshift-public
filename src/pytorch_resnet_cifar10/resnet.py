@@ -117,28 +117,28 @@ class ResNet(nn.Module):
         return out
 
 
-def resnet20(pretrained=False, num_classes=0):
-    return ResNet(BasicBlock, [3, 3, 3])
+def resnet20(**kwargs):
+    return ResNet(BasicBlock, [3, 3, 3], **kwargs)
 
 
-def resnet32():
-    return ResNet(BasicBlock, [5, 5, 5])
+def resnet32(**kwargs):
+    return ResNet(BasicBlock, [5, 5, 5], **kwargs)
 
 
-def resnet44():
-    return ResNet(BasicBlock, [7, 7, 7])
+def resnet44(**kwargs):
+    return ResNet(BasicBlock, [7, 7, 7], **kwargs)
 
 
-def resnet56(pretrained=False, num_classes=0):
-    return ResNet(BasicBlock, [9, 9, 9])
+def resnet56(**kwargs):
+    return ResNet(BasicBlock, [9, 9, 9], **kwargs)
 
 
-def resnet110():
-    return ResNet(BasicBlock, [18, 18, 18])
+def resnet110(**kwargs):
+    return ResNet(BasicBlock, [18, 18, 18], **kwargs)
 
 
-def resnet1202():
-    return ResNet(BasicBlock, [200, 200, 200])
+def resnet1202(**kwargs):
+    return ResNet(BasicBlock, [200, 200, 200], **kwargs)
 
 
 def test(net):

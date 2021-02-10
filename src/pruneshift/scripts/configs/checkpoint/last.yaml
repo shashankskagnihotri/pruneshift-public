@@ -1,0 +1,6 @@
+# @package checkpoint
+
+_target_: pytorch_lightning.callbacks.ModelCheckpoint
+save_weights_only: True
+filename: "{epoch}"
+
