@@ -2,7 +2,7 @@ defaults:
     - checkpoint: only_best
     - path: standard
     - loss: standard
-    - network: pretrained
+    - network: standard
     - trainer: standard
     - scheduler: cosine
     - optimizer: sgd

@@ -4,4 +4,5 @@ name: cifar10_augmix_corrupted
 root: ${path.dataset}
 num_workers: 10
 batch_size: 128
+no_jsd: False
 
