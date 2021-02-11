@@ -1,0 +1,9 @@
+# @package _group_
+
+_target_: pruneshift.losses.Augmix_KnowledgeDistill
+alpha: 12.
+beta: 0.1
+kd_T: 4.
+charlie: 0.9
+teacher_path: "/misc/lmbraid19/hoffmaja/models/augmix/cifar100_resnet20.0.ckpt"
+teacher_model_id: cifar100_resnet20
