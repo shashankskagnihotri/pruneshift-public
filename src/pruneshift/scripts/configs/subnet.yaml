@@ -9,7 +9,8 @@ defaults:
     - datamodule: cifar100
 
 hydrate:
-    ratio: 32
+    ratio: 4
+    method: "weight"
 
 trainer:
     max_epochs: 10

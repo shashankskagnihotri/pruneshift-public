@@ -13,7 +13,7 @@ import torch
 import torch.nn as nn
 import torchvision.models as imagenet_models
 
-from .utils import load_state_dict
+from .utils import safe_ckpt_load
 import cifar10_models as cifar_models
 import pytorch_resnet_cifar10.resnet as cifar_resnet
 
@@ -55,8 +55,7 @@ def load_checkpoint(
     else:
         version = 0 if version is None else version
         path = Path(model_path) / f"{network_id}.{version}"
-    state = load_state_dict(path)
-    network.load_state_dict(state)
+    safe_ckpt_load(network, path)
 
 
 def create_network(
@@ -103,11 +102,12 @@ def create_network(
 
     network = network_fn(num_classes=num_classes, **kwargs)
 
+    protect_classifier(name, network) 
+
     if ckpt_path is not None or model_path is not None:
         load_checkpoint(network, network_id, ckpt_path, model_path, version)
 
     # We also want to have the classifier protected from pruning.
-    protect_classifier(name, network) 
 
     return network
 

@@ -8,6 +8,32 @@ import torch.nn.utils.prune as torch_prune
 import torch.nn as nn
 import torch
 
+from pruneshift.prune_hydra import hydrate
+from pruneshift.prune_hydra import dehydrate
+from pruneshift.prune_hydra import is_hydrated
+
+
+torch.autograd.set_detect_anomaly(True)
+
+
+def safe_ckpt_load(network: nn.Module, path: Union[str, Path]):
+    """ Safe way to load a network."""
+    state_dict = load_state_dict(path)
+    hydrated, pruned = False, False
+
+    for param_name in state_dict:
+        if param_name[-5:] == "score":
+            hydrated = True
+        if param_name[-4:] == "mask":
+            pruned = True
+
+    if hydrated:
+        load_hydrated_state_dict(network, state_dict)
+    elif torch_prune.is_pruned(network):
+        load_pruned_state_dict(network, state_dict)
+    else:
+        network.load_state_dict(state_dict)
+
 
 def load_state_dict(path: Union[str, Path]):
     """ Loads a state_dict """
@@ -25,19 +51,23 @@ def load_state_dict(path: Union[str, Path]):
     return {prune_name(n): p for n, p in state_dict.items()}
 
 
-def load_pruned_state_dict(network: nn.Module, path: Union[str, Path]):
-    """ Changes and loads the network accordingly to the checkpoint."""
-    # 1. First convert the state_dict with the flat parameter names.
-    state_dict = load_state_dict(path)
+def load_hydrated_state_dict(network: nn.Module, state_dict):
+    """ Loads a hydrated network and brings it into finetuning phase."""
+    hydrate(network, ratio=1)
+    network.load_state_dict(state_dict)
+    dehydrate(network)
 
+    return network
+
+
+
+def load_pruned_state_dict(network: nn.Module, state_dict):
+    """ Changes and loads the network accordingly to the checkpoint."""
     # 2. Find all params that need to be pruned.
     for param_name, param in list(network.named_parameters()):
         if param_name + "_orig" in state_dict:
             # If the checkpoint was from hydra delete the scores.
             del state_dict[param_name]
-
-            if param_name + "_score" in state_dict:
-                del state_dict[param_name + "_score"]
 
             idx = param_name.rfind(".")
             module_name, param_name = param_name[:idx], param_name[idx + 1 :]

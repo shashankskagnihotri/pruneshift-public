@@ -13,35 +13,9 @@ import pytorch_lightning as pl
 from pruneshift.prune_info import PruneInfo
 
 
-# def percentile(t, q):
-#     k = 1 + round(.01 * float(q) * (t.numel() - 1))
-#     return t.view(-1).kthvalue(k).values.item()
-# 
-# 
-# class GetSubnet(torch.autograd.Function):
-#     @staticmethod
-#     def forward(ctx, scores, sparsity):
-#         k_val = percentile(scores, (1 - sparsity) *100)
-#         return scores < k_val
-# 
-#     @staticmethod
-#     def backward(ctx, g):
-#         return g, None 
-
 class GetSubnet(autograd.Function):
     @staticmethod
     def forward(ctx, scores, k):
-        # scores = scores.clone()
-        # num_params = round(k * scores.numel())
-        # mask = torch.ones_like(
-        #     scores, dtype=torch.bool, memory_format=torch.contiguous_format
-        # )
-        # topk = torch.topk(scores.view(-1), k=num_params, largest=False)
-        # mask.view(-1)[topk.indices] = 0
-
-        # return mask
-
-        # Get the subnetwork by sorting the scores and using the top k%
         out = scores.clone()
         _, idx = scores.flatten().sort()
         # ! We flipped it around !!!
@@ -59,11 +33,58 @@ class GetSubnet(autograd.Function):
         return g, None
 
 
+class GetSubnetLn(autograd.Function):
+    @staticmethod
+    def forward(ctx, scores, k):
+        # Taken from the torch prune module!
+        # Calculates the norm accross the correct dimensions.
+        n=1
+        dim=0
+
+        dims = list(range(scores.dim()))
+        # convert negative indexing
+        if dim < 0:
+            dim = dims[dim]
+        dims.remove(dim)
+
+        norm = torch.norm(scores, p=n, dim=dims)
+
+        num_to_keep = round((1 - k) * norm.numel())
+
+        topk = torch.topk(norm, k=num_to_keep, largest=True)
+        # topk will have .indices and .values
+
+        # Compute binary mask by initializing it to all 0s and then filling in
+        # 1s wherever topk.indices indicates, along self.dim.
+        # mask has the same shape as tensor t
+        def make_mask(t, dim, indices):
+            # init mask to 0
+            mask = torch.zeros_like(t)
+            # e.g.: slc = [None, None, None], if len(t.shape) = 3
+            slc = [slice(None)] * len(t.shape)
+            # replace a None at position=dim with indices
+            # e.g.: slc = [None, None, [0, 2, 3]] if dim=2 & indices=[0,2,3]
+            slc[dim] = indices
+            # use slc to slice mask and replace all its entries with 1s
+            # e.g.: mask[:, :, [0, 2, 3]] = 1
+            mask[slc] = 1
+            return mask
+
+        mask = make_mask(scores, dim, topk.indices)
+        return mask 
+
+    @staticmethod
+    def backward(ctx, g):
+        # send the gradient g straight-through on the backward pass.
+        return g, None
+
+
 class HydraHook:
-    def __init__(self, module, name, amount: float):
+    def __init__(self, module, name, amount: float, mask_cls=GetSubnet):
         self.name = name
         self.amount = amount
         self.module = module
+        self.mask_cls = mask_cls
 
         param = getattr(module, name)
         # Register buffers the same way as the pruning model.
@@ -74,7 +95,7 @@ class HydraHook:
         module.register_parameter(name + "_score", nn.Parameter(score))
         # nn.init.kaiming_uniform_(getattr(module, name + "_score"), a=math.sqrt(5))
         module.register_buffer(name, torch.zeros_like(param))
-        module.register_buffer(name + "_mask", GetSubnet.apply(score, amount))
+        module.register_buffer(name + "_mask", self.mask_cls.apply(score, amount))
 
         module.register_forward_pre_hook(self)
 
@@ -82,13 +103,13 @@ class HydraHook:
         score = getattr(module, self.name + "_score")
         weight = getattr(module, self.name + "_orig")
 
-        mask = GetSubnet.apply(score.abs(), self.amount)
+        mask = self.mask_cls.apply(score.abs(), self.amount)
         setattr(module, self.name + "_mask", mask)
         setattr(module, self.name, mask * weight)
 
     def remove(self):
         # Make the original param a param again.
-        mask = self.module._buffers.pop(self.name + "_mask")
+        mask = self.module._buffers.pop(self.name + "_mask").detach().clone()
         param = self.module._buffers.pop(self.name + "_orig")
         score = self.module._parameters.pop(self.name + "_score")
         # Register the main buffer.
@@ -106,8 +127,15 @@ def freeze_protected(info, reverse: bool = False):
             param.requires_grad = reverse
 
 
-def hydrate(network: nn.Module, ratio: float):
+def hydrate(network: nn.Module, ratio: float, method="weight"):
     """ Prunes a model and prepare it for the hydra pruning phase."""
+    if method == "weight":
+        mask_cls = GetSubnet
+    elif method == "l1_channels":
+        mask_cls = GetSubnetLn
+    else:
+        raise ValueError(f"Unknown mask selection type {method}.")
+
     info = PruneInfo(network, {nn.Linear: ["weight"], nn.Conv2d: ["weight"]})
 
     amount = info.ratio_to_amount(ratio)
@@ -115,7 +143,7 @@ def hydrate(network: nn.Module, ratio: float):
     target_pairs = set(info.target_pairs())
 
     for module, param_name in target_pairs:
-        HydraHook(module, param_name, amount)
+        HydraHook(module, param_name, amount, mask_cls=mask_cls)
 
     # freeze_protected(info)
     # network.fc.bias.requires_grad = False
@@ -131,8 +159,17 @@ def dehydrate(network: nn.Module):
         hooks_to_remove = []
         for k, hook in list(module._forward_pre_hooks.items()):
             param_name, mask = hook.remove()
-            custom_from_mask(module, param_name, mask)
             del module._forward_pre_hooks[k]
+            custom_from_mask(module, param_name, mask)
 
     # network.fc.bias.requires_grad = True
     # freeze_protected(info, True)
+
+def is_hydrated(network: nn.Module):
+    for module in network.modules():
+        for _, hook in module._forward_pre_hooks.items():
+            if isinstance(hook, HydraHook):
+                return True
+
+    return False
+

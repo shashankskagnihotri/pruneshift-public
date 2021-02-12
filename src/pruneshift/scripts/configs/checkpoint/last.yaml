@@ -2,5 +2,5 @@
 
 _target_: pytorch_lightning.callbacks.ModelCheckpoint
 save_weights_only: True
-filename: "{epoch}"
+save_last: True
 
