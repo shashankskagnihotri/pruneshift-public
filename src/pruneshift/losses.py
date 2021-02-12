@@ -4,9 +4,10 @@ import torch.nn as nn
 import torch.nn.functional as F
 from pytorch_lightning.metrics.functional import accuracy
 
-from .distiller_zoo import DistillKL
-from .crd.criterion import CRDLoss
+from distiller_zoo import DistillKL
+from crd.criterion import CRDLoss
 from pruneshift import networks
+
 
 class StandardLoss(nn.Module):
 
@@ -17,7 +18,7 @@ class StandardLoss(nn.Module):
         acc = accuracy(torch.argmax(logits, 1), y)
         return loss, {"acc": acc} 
 
-class CRD_Loss(nn.Module):
+class CRDLoss(nn.Module):
 
     def __init__(self, teacher_path, teacher_model_id, kd_T: float = 4., gamma:float = 0.1, charlie:float = 0.1, delta: float = 0.8):
         self.teacher_network = create_network(teacher_model_id, ckpt_path=teacher_path)
@@ -72,7 +73,7 @@ class KnowledgeDistill(nn.Module):
         stats = {"acc": acc, "kl_loss": loss, "KD_loss": loss_kd}
         return loss+loss_kd , stats
 
-class Augmix_KnowledgeDistill(nn.Module):
+class AugmixKnowledgeDistill(nn.Module):
 
     def __init__(self, teacher_path, teacher_model_id, kd_T: float = 4., charlie:float = 0.9, alpha: float = 12., beta: float = 1.):
         """ Implements the AugmixLoss from the augmix paper.
@@ -80,7 +81,7 @@ class Augmix_KnowledgeDistill(nn.Module):
         Args:
             alpha: Multiplitave factor for the jensen-shannon divergence.
         """ 
-        super(Augmix_KnowledgeDistill, self).__init__()
+        super(AugmixKnowledgeDistill, self).__init__()
         self.alpha = alpha		#scaling for the augmix loss
         self.beta = beta 		#scaling for the classification loss
         self.teacher_network = networks.create_network(teacher_model_id, ckpt_path=teacher_path)
