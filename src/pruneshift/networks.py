@@ -16,6 +16,7 @@ import torchvision.models as imagenet_models
 from .utils import load_state_dict
 import cifar10_models as cifar_models
 import pytorch_resnet_cifar10.resnet as cifar_resnet
+import models as models
 
 import logging
 
@@ -31,7 +32,7 @@ NETWORK_REGEX = re.compile(
 def protect_classifier(name: str, network: nn.Module):
     """ Defines which layers are protected. """
     if name[: 6] == "resnet":
-        network.linear.is_protected = True
+        network.fc.is_protected = True
     elif name[: 3] == "vgg":
         network.classifier[-1].is_protected = True
     elif name[: 8] == "densenet":
@@ -70,6 +71,7 @@ def create_network(
 
     Args:
         network_id: For example cifar10_resnet50.
+        prune: to implement width scaling
         ckpt_path: Direct path o a checkpoint of a network.
         model_path: Directory to find checkpoints in.
         version: Version of the checkpoint.
@@ -93,15 +95,16 @@ def create_network(
 
     if group == "cifar":
         if name[: 6] == "resnet":
-            network_fn = getattr(cifar_resnet, name)
+            network_fn = getattr(models, name)
         else:
-            network_fn = getattr(cifar_models, name)
+            network_fn = getattr(models, name)
     elif group == "imagenet":
         network_fn = getattr(imagenet_models, name)
     else:
         raise ValueError(f"Unknown group {group}.")
 
-    network = network_fn(num_classes=num_classes, **kwargs)
+    network = models.__dict__[name]()
+    #print(models.__dict__[name]())
 
     if ckpt_path is not None or model_path is not None:
         load_checkpoint(network, network_id, ckpt_path, model_path, version)

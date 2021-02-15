@@ -77,6 +77,7 @@ class BasicBlock(nn.Module):
                 )
 
     def forward(self, x):
+        #print("\n\nIs last: ", self.is_last)
         out = F.relu(self.bn1(self.conv1(x)))
         out = self.bn2(self.conv2(out))
         out += self.shortcut(x)
@@ -107,6 +108,7 @@ class ResNet(nn.Module):
         layers = []
         for stride in strides:
             layers.append(block(self.in_planes, planes, stride))
+            #layers.append(block(self.in_planes, planes, stride, is_last=(stride==len(strides)-2)))
             self.in_planes = planes * block.expansion
 
         return nn.Sequential(*layers)
@@ -131,24 +133,27 @@ class ResNet(nn.Module):
         out = F.relu(self.bn1(self.conv1(x)))
         f0 = x
         
-        out, f1_pre = self.layer1(out)
+        #out, f1_pre = self.layer1(out)
+        out = self.layer1(out)
         f1 = out
-        out, f2_pre = self.layer2(out)
+        #out, f2_pre = self.layer2(out)
+        out = self.layer2(out)
         f2 = out
-        out, f3_pre = self.layer3(out)
+        #out, f3_pre = self.layer3(out)
+        out = self.layer3(out)
         f3 = out
         out = F.avg_pool2d(out, out.size()[3])        
         out = out.view(out.size(0), -1)
         f4 = out
         out = self.linear(out)
         
-        if is_feat:
-            if preact:
-                return[f0, f1_pre, f2_pre, f3_pre, f4], x
-            else:
-                return [f0, f1, f2, f3, f4], x
-        else:
-            return out
+        #if is_feat:
+            #if preact:
+                #return[f0, f1_pre, f2_pre, f3_pre, f4], x
+            #else:
+                #return [f0, f1, f2, f3, f4], x
+        #else:
+        return out
 
 
 def resnet20(**kwargs):

@@ -74,7 +74,7 @@ class KnowledgeDistill(nn.Module):
 
 class Augmix_KnowledgeDistill(nn.Module):
 
-    def __init__(self, teacher_path, teacher_model_id, kd_T: float = 4., charlie:float = 0.9, alpha: float = 12., beta: float = 1.):
+    def __init__(self, teacher_path, teacher_model_id, kd_T: float = 4., charlie:float = 0.5, alpha: float = 12., beta: float = 0.5):
         """ Implements the AugmixLoss from the augmix paper.
 
         Args:
@@ -113,12 +113,13 @@ class Augmix_KnowledgeDistill(nn.Module):
                    F.kl_div(p_mixture, p_aug2, reduction='batchmean')) / 3.
         loss_js *= self.alpha
 
-        loss = self.beta * F.cross_entropy(logits[0], y)
+        loss = F.cross_entropy(logits[0], y)
         acc = accuracy(torch.argmax(logits[0], 1), y)
+        loss_cls = (loss + loss_js)*self.beta
     
         stats = {"acc": acc, "kl_loss": loss, "augmix_loss": loss_js, "KD_loss": loss_kd}
     
-        return loss + loss_js + loss_kd, stats 
+        return loss_cls + loss_kd, stats 
 
 class AugmixLoss(nn.Module):
 
