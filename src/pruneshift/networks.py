@@ -103,7 +103,8 @@ def create_network(
     else:
         raise ValueError(f"Unknown group {group}.")
 
-    network = models.__dict__[name]()
+    #network = models.__dict__[name]()
+    network = network_fn(num_classes=num_classes, **kwargs)
     #print(models.__dict__[name]())
 
     if ckpt_path is not None or model_path is not None:
