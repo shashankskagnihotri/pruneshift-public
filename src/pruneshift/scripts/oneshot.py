@@ -9,6 +9,7 @@ from pruneshift.scripts.utils import create_trainer
 from pruneshift.scripts.utils import save_config
 from pruneshift.scripts.utils import create_optim
 from pruneshift.scripts.utils import partial_instantiate
+from pruneshift.scripts.utils import seed_everything
 from pruneshift.modules import PrunedModule 
 from pruneshift.datamodules import datamodule
 from pruneshift.prune import prune
@@ -36,7 +37,7 @@ def oneshot(cfg):
                           optimizer_fn=optimizer_fn,
                           scheduler_fn=scheduler_fn,
                           train_loss=train_loss)
-
+    seed_everything(cfg)
     trainer.fit(module, datamodule=data)
     trainer.test(module, datamodule=data)
 

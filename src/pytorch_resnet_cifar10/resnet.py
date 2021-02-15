@@ -89,16 +89,16 @@ class BasicBlock(nn.Module):
 
 
 class ResNet(nn.Module):
-    def __init__(self, block, num_blocks, num_classes=10):
+    def __init__(self, block, num_blocks, scaling=1, num_classes=10):
         super(ResNet, self).__init__()
-        self.in_planes = 16
+        self.in_planes = scaling * 16
 
-        self.conv1 = nn.Conv2d(3, 16, kernel_size=3, stride=1, padding=1, bias=False)
-        self.bn1 = nn.BatchNorm2d(16)
-        self.layer1 = self._make_layer(block, 16, num_blocks[0], stride=1)
-        self.layer2 = self._make_layer(block, 32, num_blocks[1], stride=2)
-        self.layer3 = self._make_layer(block, 64, num_blocks[2], stride=2)
-        self.linear = nn.Linear(64, num_classes)
+        self.conv1 = nn.Conv2d(3, 16 * scaling, kernel_size=3, stride=1, padding=1, bias=False)
+        self.bn1 = nn.BatchNorm2d(16 * scaling)
+        self.layer1 = self._make_layer(block, 16 * scaling, num_blocks[0], stride=1)
+        self.layer2 = self._make_layer(block, 32 * scaling, num_blocks[1], stride=2)
+        self.layer3 = self._make_layer(block, 64 * scaling, num_blocks[2], stride=2)
+        self.linear = nn.Linear(64 * scaling, num_classes)
 
         self.apply(_weights_init)
 
@@ -111,44 +111,37 @@ class ResNet(nn.Module):
 
         return nn.Sequential(*layers)
 
-    def get_feat_modules(self):
-    	feat_m = nn.ModuleList([])
-    	feat_m.append(self.conv1)
-    	feat_m.append(self.bn1)
-    	feat_m.append(nn.ReLU(self.bn1(self.conv1(x))))
-    	feat_m.append(self.layer1)
-    	feat_m.append(self.layer2)
-    	feat_m.append(self.layer3)
-    	return feat_m
-    
-    def get_bn_before_relu(self):
-    	bn1 = self.layer1[-1].bn2
-    	bn2 = self.layer2[-1].bn2
-    	bn3 = self.layer3[-1].bn2
-    	return [bn1, bn2, bn3]
+    # def get_feat_modules(self):
+    # 	feat_m = nn.ModuleList([])
+    # 	feat_m.append(self.conv1)
+    # 	feat_m.append(self.bn1)
+    # 	feat_m.append(nn.ReLU(self.bn1(self.conv1(x))))
+    # 	feat_m.append(self.layer1)
+    # 	feat_m.append(self.layer2)
+    # 	feat_m.append(self.layer3)
+    # 	return feat_m
+    # 
+    # def get_bn_before_relu(self):
+    # 	bn1 = self.layer1[-1].bn2
+    # 	bn2 = self.layer2[-1].bn2
+    # 	bn3 = self.layer3[-1].bn2
+    # 	return [bn1, bn2, bn3]
     
     def forward(self, x):
         out = F.relu(self.bn1(self.conv1(x)))
-        f0 = x
-        
-        out, f1_pre = self.layer1(out)
-        f1 = out
-        out, f2_pre = self.layer2(out)
-        f2 = out
-        out, f3_pre = self.layer3(out)
-        f3 = out
+        out = self.layer1(out)
+        out = self.layer2(out)
+        out = self.layer3(out)
         out = F.avg_pool2d(out, out.size()[3])        
         out = out.view(out.size(0), -1)
-        f4 = out
         out = self.linear(out)
         
-        if is_feat:
-            if preact:
-                return[f0, f1_pre, f2_pre, f3_pre, f4], x
-            else:
-                return [f0, f1, f2, f3, f4], x
-        else:
-            return out
+        # if is_feat:
+        #     if preact:
+        #         return[f0, f1_pre, f2_pre, f3_pre, f4], x
+        #     else:
+        #         return [f0, f1, f2, f3, f4], x
+        return out
 
 
 def resnet20(**kwargs):

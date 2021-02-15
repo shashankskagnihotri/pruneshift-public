@@ -1,4 +1,5 @@
 """ Implements losses and criterions."""
+import math
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -17,6 +18,8 @@ class StandardLoss(nn.Module):
         loss = F.cross_entropy(logits, y)
         acc = accuracy(torch.argmax(logits, 1), y)
         return loss, {"acc": acc} 
+
+
 
 class CRDLoss(nn.Module):
 
@@ -49,9 +52,11 @@ class CRDLoss(nn.Module):
         stats = {"acc": acc, "kl_loss": loss, "KD_loss": loss_kd, "CRD_loss": loss_crd}
         return loss+loss_kd+loss_crd , stats
 
+
 class KnowledgeDistill(nn.Module):
 
     def __init__(self, teacher_path, teacher_model_id, kd_T: float = 4., gamma:float = 0.1, charlie:float = 0.9):
+        super(KnowledgeDistill, self).__init__()
         self.teacher_network = networks.create_network(teacher_model_id, ckpt_path=teacher_path)
         self.kd_T = kd_T 	 	#temperature for KD
         self.gamma = gamma 	 	#scaling for the classification loss
@@ -59,7 +64,6 @@ class KnowledgeDistill(nn.Module):
 
     def forward(self, network: nn.Module, batch):
         x,y = batch
-        
         logits = network(x)
         #print("\n\n\n\n")
         #print(logits)
@@ -72,6 +76,7 @@ class KnowledgeDistill(nn.Module):
         acc = accuracy(torch.argmax(logits, 1), y)
         stats = {"acc": acc, "kl_loss": loss, "KD_loss": loss_kd}
         return loss+loss_kd , stats
+
 
 class AugmixKnowledgeDistill(nn.Module):
 
@@ -87,7 +92,6 @@ class AugmixKnowledgeDistill(nn.Module):
         self.teacher_network = networks.create_network(teacher_model_id, ckpt_path=teacher_path)
         self.kd_T = kd_T 	 	#temperature for KD
         self.charlie = charlie  	#scaling for the KD loss
-
 
     def forward(self, network: nn.Module, batch):
         x, y = batch
@@ -123,7 +127,7 @@ class AugmixKnowledgeDistill(nn.Module):
 
 class AugmixLoss(nn.Module):
 
-    def __init__(self, alpha: float = 12., beta: float = 1.):
+    def __init__(self, alpha: float = 12., beta: float = 1., soft_target: bool = False):
         """ Implements the AugmixLoss from the augmix paper.
 
         Args:
@@ -132,11 +136,21 @@ class AugmixLoss(nn.Module):
         super(AugmixLoss, self).__init__()
         self.alpha = alpha
         self.beta = beta 
+        self.soft_target = soft_target
 
 
     def forward(self, network: nn.Module, batch):
         x, y = batch
-        logits = torch.split(network(torch.cat(x)), x[0].shape[0])
+
+        if self.soft_target:
+            pred0 = network(x[0])
+            with torch.no_grad():
+                pred1, pred2 = torch.split(network(torch.cat(x[1: ])), x[0].shape[0])
+            logits = [pred0, pred1, pred2]
+
+        else:
+            logits = torch.split(network(torch.cat(x)), x[0].shape[0])
+        
     
         p_clean, p_aug1, p_aug2 = F.softmax(
             logits[0], dim=1), F.softmax(

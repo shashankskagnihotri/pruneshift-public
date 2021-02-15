@@ -1,0 +1,4 @@
+# @package _group_
+
+_target_: pruneshift.losses.YoloLoss
+epsilon: 0.01

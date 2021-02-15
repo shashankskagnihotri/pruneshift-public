@@ -6,18 +6,21 @@ Thus, they must be manually trained and provided in a checkpoint directory.
 The checkpoints must have the following form:
     {network_id}.{version}
 """
+from functools import partial
 import re
 from pathlib import Path
+from typing import Callable
+import logging
 
 import torch
 import torch.nn as nn
 import torchvision.models as imagenet_models
+import pytorch_lightning as pl
 
 from .utils import safe_ckpt_load
 import cifar10_models as cifar_models
 import pytorch_resnet_cifar10.resnet as cifar_resnet
 
-import logging
 
 
 logger = logging.getLogger(__name__)
@@ -27,11 +30,25 @@ NETWORK_REGEX = re.compile(
     r"(?P<group>[a-zA-Z]+)(?P<num_classes>[0-9]+)_(?P<name>[a-zA-Z0-9_]+)"
 )
 
+def add_reset_hook(network: nn.Module, network_factory: Callable, version=0):
+    """ Adds a reset option to a network, usable for lottery ticket stuff."""
+
+    def reset_hook():
+        logger.info(f"Setting the seed to {version} to recreate original network.")
+        pl.seed_everything(version)
+        orig_state_dict = network_factory().state_dict()
+        network.load_state_dict(orig_state_dict, strict=False)
+
+    network.__reset_hook = reset_hook
+
 
 def protect_classifier(name: str, network: nn.Module):
     """ Defines which layers are protected. """
     if name[: 6] == "resnet":
-        network.linear.is_protected = True
+        if hasattr(network, "linear"):
+            network.linear.is_protected = True
+        else:
+            network.fc.is_protected = True
     elif name[: 3] == "vgg":
         network.classifier[-1].is_protected = True
     elif name[: 8] == "densenet":
@@ -102,12 +119,14 @@ def create_network(
 
     network = network_fn(num_classes=num_classes, **kwargs)
 
+    # We also want to have the classifier protected from pruning.
     protect_classifier(name, network) 
 
     if ckpt_path is not None or model_path is not None:
         load_checkpoint(network, network_id, ckpt_path, model_path, version)
 
-    # We also want to have the classifier protected from pruning.
+    # Add a reset hook for lottery style shemes.
+    add_reset_hook(network, partial(create_network, network_id), version)
 
     return network
 

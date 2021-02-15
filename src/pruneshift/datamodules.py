@@ -28,6 +28,7 @@ def datamodule(
     batch_size: int = 32,
     num_workers: int = 5,
     val_split: Optional[float] = None,
+    val_swap: bool = False,
     **kwargs,
 ) -> pl.LightningDataModule:
     """Creates a LightningDataModule.
@@ -47,6 +48,7 @@ def datamodule(
         batch_size=batch_size,
         num_workers=num_workers,
         val_split=val_split,
+        val_swap=val_swap,
         **kwargs
     )
 
@@ -62,6 +64,7 @@ class BaseDataModule(pl.LightningDataModule):
         batch_size: int,
         num_workers: int,
         val_split: Optional[float],
+        val_swap: bool = False,
         with_normalize: bool = True,
         **kwargs,
     ):
@@ -70,6 +73,7 @@ class BaseDataModule(pl.LightningDataModule):
         self.batch_size = batch_size
         self.num_workers = num_workers
         self.val_split = val_split
+        self.val_swap = val_swap
         self.with_normalize = with_normalize
         self.train_dataset = None
         self.val_dataset = None
@@ -218,8 +222,12 @@ class CIFAR10Module(BaseDataModule):
                 split_point = int(len(dataset) * self.val_split)
                 val_dataset = Subset(dataset, range(split_point))
                 train_dataset = Subset(dataset, range(split_point, len(dataset)))
-                train_dataset = TransformWrapper(train_dataset, transform[0])
-                val_dataset = TransformWrapper(val_dataset, transform[1])
+                if self.val_swap:
+                    train_dataset = TransformWrapper(val_dataset, transform[0])
+                    val_dataset = TransformWrapper(train_dataset, transform[1])
+                else:
+                    train_dataset = TransformWrapper(train_dataset, transform[0])
+                    val_dataset = TransformWrapper(val_dataset, transform[1])
                 return train_dataset, val_dataset
             else:
                 train_dataset = self.cifar_cls(self.root, True, transform[0])

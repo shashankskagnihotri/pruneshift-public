@@ -2,4 +2,5 @@
 
 _target_: pruneshift.networks.create_network
 network_id: "cifar100_resnet20"
+version: 0
 

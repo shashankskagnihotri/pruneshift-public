@@ -10,12 +10,11 @@ from .prune_info import PruneInfo
 
 
 class MaskShuffel(prune_torch.L1Unstructured):
-
     def compute_mask(self):
         mask = super(MaskShuffel, self).compute_mask()
         idx = torch.randperm(mask.numel())
         return mask.view(-1)[idx].view(mask.size())
-        
+
 
 class L1GradUnstructered(prune_torch.L1Unstructured):
     """
@@ -25,11 +24,14 @@ class L1GradUnstructered(prune_torch.L1Unstructured):
         >>> net(torch.tensor([2.])).backward()
         >>> simple_prune(net, AbsoluteGradMethod, amount=2)
     """
+
     def compute_mask(self, t, default_mask):
         return super(L1GradUnstructered, self).compute_mask(t.grad, default_mask)
 
 
-def prune(network: nn.Module, method: str, ratio: float) -> PruneInfo:
+def prune(
+    network: nn.Module, method: str, ratio: float, reset_weights: bool = False
+) -> PruneInfo:
     """Prunes a network inplace.
 
     Note that some networks require having loaded a gradient already.
@@ -37,6 +39,7 @@ def prune(network: nn.Module, method: str, ratio: float) -> PruneInfo:
     Args:
         network: The network to prune.
         method: The name of the pruning method.
+        reset_seed: If passed resets the weight with the given seed.
 
     Returns:
         Returns info about the pruning.
@@ -61,6 +64,9 @@ def prune(network: nn.Module, method: str, ratio: float) -> PruneInfo:
         pruning_cls = L1GradUnstructered
         layerwise = True
         raise NotImplementedError
+    elif method == "l1_channels_lottery":
+        pruning_cls = partial(prune_torch.ln_structured, n=1, dim=0)
+
     elif method == "l1_channels":
         pruning_cls = partial(prune_torch.ln_structured, n=1, dim=0)
         layerwise = True
@@ -77,6 +83,11 @@ def prune(network: nn.Module, method: str, ratio: float) -> PruneInfo:
     if shuffle:
         shuffle_masks(prune_info)
 
+    if reset_weights:
+        # The reset hook should have been added by the create_network
+        # function.
+        network.__reset_hook()
+
     return prune_info
 
 
@@ -92,7 +103,7 @@ def simple_prune(
     prune_info: PruneInfo,
     pruning_method: Union[Callable, Type[prune_torch.BasePruningMethod]],
     layerwise: bool = False,
-    **kwargs
+    **kwargs,
 ):
     pairs = list(prune_info.target_pairs())
 
@@ -105,4 +116,3 @@ def simple_prune(
                 continue
 
             pruning_method.apply(submodule, param_name, **kwargs)
-

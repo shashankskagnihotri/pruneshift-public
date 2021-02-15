@@ -4,5 +4,5 @@ _target_: pruneshift.losses.KnowledgeDistill
 kd_T: 4.
 gamma: 0.1
 charlie: 0.9
-teacher_path: path.model
-teacher_model_id: cifar100_resnet18
+teacher_path: "/misc/lmbraid19/hoffmaja/models/augmix/cifar100_resnet20.0"
+teacher_model_id: cifar100_resnet20
