@@ -1,6 +1,6 @@
 # @package _group_
 
 _target_: pruneshift.networks.create_network
-network_id: "cifar100_resnet20"
+network_id: "cifar100_resnet18"
 version: 0
 

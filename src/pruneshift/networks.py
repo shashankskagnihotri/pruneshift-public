@@ -20,6 +20,7 @@ import pytorch_lightning as pl
 from .utils import safe_ckpt_load
 import cifar10_models as cifar_models
 import pytorch_resnet_cifar10.resnet as cifar_resnet
+import models as models
 
 
 
@@ -109,9 +110,9 @@ def create_network(
 
     if group == "cifar":
         if name[: 6] == "resnet":
-            network_fn = getattr(cifar_resnet, name)
+            network_fn = getattr(models, name)
         else:
-            network_fn = getattr(cifar_models, name)
+            network_fn = getattr(models, name)
     elif group == "imagenet":
         network_fn = getattr(imagenet_models, name)
     else:
@@ -120,7 +121,7 @@ def create_network(
     network = network_fn(num_classes=num_classes, **kwargs)
 
     # We also want to have the classifier protected from pruning.
-    protect_classifier(name, network) 
+    protect_classifier(name, network)
 
     if ckpt_path is not None or model_path is not None:
         load_checkpoint(network, network_id, ckpt_path, model_path, version)
