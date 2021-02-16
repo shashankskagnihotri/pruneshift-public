@@ -50,7 +50,6 @@ class BasicBlock(nn.Module):
         groups: int = 1,
         base_width: int = 64,
         dilation: int = 1,
-        path: str ='',
         norm_layer: Optional[Callable[..., nn.Module]] = None
     ) -> None:
         super(BasicBlock, self).__init__()
@@ -69,8 +68,6 @@ class BasicBlock(nn.Module):
         self.downsample = downsample
         self.stride = stride
         self.relu2 = nn.ReLU(inplace=True)
-        self.path = ResNet.pat
-        #print('block path: ', self.path)
 
     def forward(self, x: Tensor) -> Tensor:
         identity = x
@@ -79,15 +76,6 @@ class BasicBlock(nn.Module):
         out = self.conv1(x)
         out = self.bn1(out)
         out = self.relu1(out)
-        #print("calling forward")
-        # loc = self.path + str(BasicBlock.counter)+ '.pt'
-        # torch.save(out, loc)
-        BasicBlock.counter += 1
-        #activations.append(out.cpu().detach().numpy())
-        #with open(self.path, 'wb') as f:
-            #np.savez(f, out.cpu().detach().numpy(),allow_pickle=True)
-            #pickle.dump(out.cpu().detach().numpy(), f)
-            #f.write(str(out.cpu().detach().numpy()))
 
         out = self.conv2(out)
         out = self.bn2(out)
@@ -97,14 +85,6 @@ class BasicBlock(nn.Module):
 
         out += identity
         out = self.relu2(out)
-        # loc = self.path + str(BasicBlock.counter)+ '.pt'
-        # torch.save(out, loc)
-        #activations.append(out.cpu().detach().numpy())
-        #with open(self.path, 'wb') as f:
-            #np.savez(f, out.cpu().detach().numpy(),allow_pickle=True)
-            #pickle.dump(out.cpu().detach().numpy(), f)
-            #f.write(str(out.cpu().detach().numpy()))
-
         return out
 
 
@@ -169,7 +149,6 @@ class Bottleneck(nn.Module):
 class ResNet(nn.Module):
 
     activate = []
-    pat =''
     def __init__(
         self,
         block: Type[Union[BasicBlock, Bottleneck]],
@@ -180,7 +159,6 @@ class ResNet(nn.Module):
         groups: int = 1,
         dropout:float = 0.0,
         width_per_group: int = 64,
-        path: str ='/misc/lmbraid19/agnihotr/',
         replace_stride_with_dilation: Optional[List[bool]] = None,
         norm_layer: Optional[Callable[..., nn.Module]] = None
     ) -> None:
@@ -191,10 +169,7 @@ class ResNet(nn.Module):
         self.dropout = dropout
         self.inplanes = 64
         self.dilation = 1
-        self.path = path
         
-        ResNet.pat = path
-        #print('path: ', ResNet.pat)
         if replace_stride_with_dilation is None:
             # each element in the tuple indicates if we should replace
             # the 2x2 stride with a dilated convolution instead
@@ -267,16 +242,6 @@ class ResNet(nn.Module):
         x = self.conv1(x)
         x = self.bn1(x)
         x = self.relu(x)
-        
-        # BasicBlock.counter = 0
-        # loc = self.path + str(BasicBlock.counter)+ '.pt'
-        # torch.save(x, loc)
-        
-        #activations.append(x.cpu().detach().numpy())
-        #with open(self.path, 'wb') as f:
-            #np.savez(f, x.cpu().detach().numpy(),allow_pickle=True)
-            #pickle.dump(x.cpu().detach().numpy(), f)
-            #f.write(str(x.cpu().detach().numpy()))
         x = self.maxpool(x)
 
         x = self.layer1(x)
@@ -293,7 +258,6 @@ class ResNet(nn.Module):
     def forward(self, x: Tensor) -> Tensor:
         return self._forward_impl(x)
     
-    #activate = activations
 
 
 def _resnet(
