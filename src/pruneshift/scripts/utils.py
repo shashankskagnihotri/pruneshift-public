@@ -1,6 +1,7 @@
 from functools import partial
 from pathlib import Path
 import logging
+import warnings
 
 from hydra.utils import instantiate
 from omegaconf import DictConfig, OmegaConf
@@ -50,6 +51,9 @@ def create_trainer(cfg: DictConfig):
     callbacks.append(instantiate(cfg.checkpoint, dirpath=path/"checkpoint"))
     # We also want to log the learning rate.
     callbacks.append(LearningRateMonitor("epoch"))
+
+    # Add a filter for the filterwarnings.
+    warnings.filterwarnings("ignore", module="pytorch_lightning.utilities.distributed", lineno=45)
 
     deterministic = True
 
