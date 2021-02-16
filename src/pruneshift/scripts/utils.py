@@ -37,14 +37,6 @@ def create_optim(cfg: DictConfig):
     return {"optimizer_fn": partial(instantiate, cfg.optimizer),
             "scheduler_fn": partial(instantiate, cfg.scheduler)}
 
-def seed_everything(cfg: DictConfig):
-    if not isinstance(cfg.seed, int):
-        msg = "Found no viable seed. A seed must be given by the user otherwise "\
-              "backends like ddp will be buggy with random pruning strategies."
-        raise RuntimeError(msg)
-
-    pl.seed_everything(cfg.seed)
-
 
 def create_trainer(cfg: DictConfig):
     """ Creates a `pl.Trainer` for our experiment setup."""

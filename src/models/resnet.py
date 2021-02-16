@@ -80,8 +80,8 @@ class BasicBlock(nn.Module):
         out = self.bn1(out)
         out = self.relu1(out)
         #print("calling forward")
-        loc = self.path + str(BasicBlock.counter)+ '.pt'
-        torch.save(out, loc)
+        # loc = self.path + str(BasicBlock.counter)+ '.pt'
+        # torch.save(out, loc)
         BasicBlock.counter += 1
         #activations.append(out.cpu().detach().numpy())
         #with open(self.path, 'wb') as f:
@@ -97,8 +97,8 @@ class BasicBlock(nn.Module):
 
         out += identity
         out = self.relu2(out)
-        loc = self.path + str(BasicBlock.counter)+ '.pt'
-        torch.save(out, loc)
+        # loc = self.path + str(BasicBlock.counter)+ '.pt'
+        # torch.save(out, loc)
         #activations.append(out.cpu().detach().numpy())
         #with open(self.path, 'wb') as f:
             #np.savez(f, out.cpu().detach().numpy(),allow_pickle=True)
@@ -268,9 +268,9 @@ class ResNet(nn.Module):
         x = self.bn1(x)
         x = self.relu(x)
         
-        BasicBlock.counter = 0
-        loc = self.path + str(BasicBlock.counter)+ '.pt'
-        torch.save(x, loc)
+        # BasicBlock.counter = 0
+        # loc = self.path + str(BasicBlock.counter)+ '.pt'
+        # torch.save(x, loc)
         
         #activations.append(x.cpu().detach().numpy())
         #with open(self.path, 'wb') as f:

@@ -4,6 +4,7 @@ from functools import partial
 import hydra
 from hydra.utils import instantiate
 from hydra.utils import call
+from pytorch_lightning import seed_everything
 
 from pruneshift.scripts.utils import create_trainer
 from pruneshift.scripts.utils import save_config
@@ -38,6 +39,7 @@ def subnet(cfg):
                           scheduler_fn=scheduler_fn,
                           train_loss=train_loss)
 
+    seed_everything(cfg.seed)
     trainer.fit(module, datamodule=data)
     trainer.test(module, datamodule=data)
 
