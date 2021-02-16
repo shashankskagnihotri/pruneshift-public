@@ -53,6 +53,8 @@ def create_trainer(cfg: DictConfig):
 
     deterministic = True
 
+    pl.seed_everything(cfg.seed)
+
     trainer = instantiate(
         cfg.trainer,
         logger=loggers,
