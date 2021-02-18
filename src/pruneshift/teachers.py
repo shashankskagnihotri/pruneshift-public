@@ -36,7 +36,7 @@ def create_teacher(
         model_path=model_path,
         version=version,
         download=download,
-        imagenet_subset=True,
+        imagenet_subset=imagenet_subset,
     )
 
     return Teacher(network)
@@ -47,8 +47,7 @@ class Teacher(nn.Module):
         super(Teacher, self).__init__()
         self.network = network
 
-    def forward(self, batch):
-        _, x, y = batch
+    def forward(self, idx, x):
         return self.network(x)
 
 
@@ -58,9 +57,7 @@ class DatabaseNetwork(Teacher):
         self.activations = np.memmap(path, mode="r", dtype=np.float32)
         self.activations = np.reshape(self.activations, (-1, num_classes))
 
-    def forward(self, batch):
-        idx, _, _ = batch
-
+    def forward(self, idx, x):
         activations = torch.tensor(self.activations[idx.cpu().numpy()])
         return activations.to(idx.device)
 

@@ -44,7 +44,7 @@ class KnowledgeDistill(nn.Module):
         criterion_dv = DistillKL(self.kd_T)
         self.teacher.eval()
         with torch.no_grad():
-            teacher_logits = self.teacher(batch)
+            teacher_logits = self.teacher(idx, x)
         loss = F.cross_entropy(logits, y) * self.gamma
         loss_kd = criterion_dv(logits, teacher_logits) * self.charlie
         acc = accuracy(torch.argmax(logits, 1), y)
@@ -76,12 +76,14 @@ class AugmixKnowledgeDistill(nn.Module):
     def forward(self, network: nn.Module, batch):
         idx, x, y = batch
 
+        comb_x = torch.cat(x)
+
         self.teacher.eval()
         criterion_dv = DistillKL(self.kd_T)
 
-        kd_logits = network(torch.cat(x))
+        kd_logits = network(comb_x)
         with torch.no_grad():
-            teacher_logits = self.teacher(batch)
+            teacher_logits = self.teacher(idx, comb_x)
 
         loss_kd = criterion_dv(kd_logits, teacher_logits) * self.charlie
         logits = torch.split(kd_logits, logits.shape[0] // 3)
