@@ -1,7 +1,7 @@
 # @package _group_
 
-_target_: pruneshift.losses.Augmix_KnowledgeDistill
+_target_: pruneshift.losses.AugmixKnowledgeDistill
 alpha: 12.
-beta: 0.1
+beta: 0.5
 kd_T: 4.
-charlie: 0.9
+charlie: 0.5
