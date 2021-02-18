@@ -50,6 +50,7 @@ class BasicBlock(nn.Module):
         groups: int = 1,
         base_width: int = 64,
         dilation: int = 1,
+        is_last: bool = False,
         norm_layer: Optional[Callable[..., nn.Module]] = None
     ) -> None:
         super(BasicBlock, self).__init__()
@@ -84,8 +85,12 @@ class BasicBlock(nn.Module):
             identity = self.downsample(x)
 
         out += identity
+        preact = out       
         out = self.relu2(out)
-        return out
+        if self.is_last:
+            return out, preact
+        else:
+            return out
 
 
 class Bottleneck(nn.Module):
@@ -106,6 +111,7 @@ class Bottleneck(nn.Module):
         groups: int = 1,
         base_width: int = 64,
         dilation: int = 1,
+        is_last: bool = False
         norm_layer: Optional[Callable[..., nn.Module]] = None
     ) -> None:
         super(Bottleneck, self).__init__()
@@ -141,9 +147,13 @@ class Bottleneck(nn.Module):
             identity = self.downsample(x)
 
         out += identity
+        preact = out
         out = self.relu(out)
-
-        return out
+        
+        if is_last:
+            return out, preact
+        else:
+            return out
 
 
 class ResNet(nn.Module):
@@ -228,32 +238,73 @@ class ResNet(nn.Module):
 
         layers = []
         layers.append(block(self.inplanes, planes, stride, downsample, self.groups,
-                            self.base_width, previous_dilation, norm_layer))
+                            self.base_width, previous_dilation, is_last=(blocks ==1), norm_layer))
         self.inplanes = planes * block.expansion
-        for _ in range(1, blocks):
+        for i in range(1, blocks):
             layers.append(block(self.inplanes, planes, groups=self.groups,
                                 base_width=self.base_width, dilation=self.dilation,
-                                norm_layer=norm_layer))
+                                is_last=(i == blocks-1), norm_layer=norm_layer))
 
         return nn.Sequential(*layers)
 
+    def get_feat_modules(self):
+        feat_m= nn.ModuleList([])
+        feat_m.append(self.conv1)
+        feat_m.append(self.bn1)
+        feat_m.append(self.relu)
+        feat_m.append(self.layer1)
+        feat_m.append(self.layer2)
+        feat_m.append(self.layer3)
+        feat_m.append(self.layer4)
+        return feat_m
+    
+    def get_bn_before_relu(self):
+        if isinstance(self.layer1[0], Bottleneck):
+            bn1 = self.layer1[-1].bn3
+            bn2 = self.layer2[-1].bn3
+            bn3 = self.layer3[-1].bn3
+            bn4 = self.layer4[-1].bn3
+        elif isinstance(self.layer1[0], BasicBlock):
+            bn1 = self.layer1[-1].bn2
+            bn2 = self.layer2[-1].bn2
+            bn3 = self.layer3[-1].bn2
+            bn4 = self.layer4[-1].bn2
+        return [bn1, bn2, bn3, bn4]
+    
     def _forward_impl(self, x: Tensor) -> Tensor:
         # See note [TorchScript super()]
         x = self.conv1(x)
         x = self.bn1(x)
         x = self.relu(x)
+        f0 = x
+        
         x = self.maxpool(x)
 
-        x = self.layer1(x)
-        x = self.layer2(x)
-        x = self.layer3(x)
-        x = self.layer4(x)
+        x, f1_pre = self.layer1(x)
+        f1 = x
+        
+        x, f2_pre = self.layer2(x)
+        f2 = x
+        
+        x, f3_pre = self.layer3(x)
+        f3 = x
+        
+        x, f4_pre = self.layer4(x)
+        f4 = x
 
         x = self.avgpool(x)
         x = torch.flatten(x, 1)
+        f5 = x
+        
         x = self.fc(x)
 
-        return x
+        if is_feat:
+            if preact:
+                return [f0, f1_pre, f2_pre, f3_pre, f4_pre, f5], x
+            else:
+                return [f0, f1, f2, f3, f4, f5], x
+        else:
+            return x
 
     def forward(self, x: Tensor) -> Tensor:
         return self._forward_impl(x)
