@@ -1,0 +1,12 @@
+# @package _global_
+
+datamodule:
+    name: imagenet_corrupted
+    root: ${path.imagenet200}
+    num_workers: 4
+    batch_size: 128
+
+network:
+    num_classes: 200
+    group: imagenet
+

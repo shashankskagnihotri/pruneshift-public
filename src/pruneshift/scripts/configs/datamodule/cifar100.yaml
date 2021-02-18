@@ -1,7 +1,12 @@
-# @package _group_
+# @package _global_
 
-name: cifar100_corrupted
-root: ${path.dataset}
-num_workers: 10
-batch_size: 128
+datamodule:
+    name: cifar100_corrupted
+    root: ${path.dataset}
+    num_workers: 10
+    batch_size: 128
+
+network:
+    num_classes: 100
+    group: cifar
 

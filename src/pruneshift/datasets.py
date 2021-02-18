@@ -14,6 +14,7 @@ import torch.utils.data as data
 from augmix.dataset import AugMixWrapper
 
 
+
 class SplitImageFolder(ImageFolder):
     """Efficiently calculates split sets from image folders.
 
@@ -70,15 +71,20 @@ class SplitImageFolder(ImageFolder):
 
 
 class TransformWrapper(Dataset):
-    def __init__(self, dataset, transform):
+    def __init__(self, dataset, transform, with_idx=False):
         self.dataset = dataset
         self.transform = transform
+        self.with_idx = with_idx
 
     def __getitem__(self, idx):
-        if self.transform is None:
-            return self.dataset[idx]
         x, y = self.dataset[idx]
-        return self.transform(x), y
+
+        if self.transform is not None:
+            x = self.transform(x)
+ 
+        if self.with_idx:
+            return idx, x, y
+        return x, y
 
     def __len__(self):
         return len(self.dataset)
@@ -170,7 +176,7 @@ class CIFAR100C(CIFAR10C):
     url = "https://zenodo.org/record/3555552/files/CIFAR-100-C.tar"
 
 
-class ImageNet100C:
+class ImageNetC:
     distortions_list = [
         "brightness",
         "contrast",
@@ -190,11 +196,11 @@ class ImageNet100C:
     ]
 
     def __init__(self, root: str, distortion: str, transform=None, download=False):
-        self.root = root
+        self.root = Path(root) / "corrupted"
         self.distortion = distortion
         self.transform = transform
 
     def lvl_subsets(self):
-        path = Path(self.root) / self.distortion
+        path = self.root / self.distortion
         return [ImageFolder(path / str(i), self.transform) for i in range(1, 6)]
 

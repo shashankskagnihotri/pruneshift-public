@@ -1,0 +1,8 @@
+# @package _group_
+
+name: ${network.name} 
+model_path: ${network.model_path}
+ckpt_path: ${network.ckpt_path} 
+version: ${network.version}
+num_classes: ${network.num_classes}
+group: ${network.group}

@@ -7,8 +7,8 @@ from hydra.utils import call
 
 from pruneshift.scripts.utils import create_trainer
 from pruneshift.scripts.utils import save_config
-from pruneshift.scripts.utils import create_optim
 from pruneshift.scripts.utils import partial_instantiate
+from pruneshift.scripts.utils import create_loss
 from pruneshift.modules import VisionModule 
 from pruneshift.datamodules import datamodule
 from pruneshift.prune_hydra import hydrate 
@@ -27,7 +27,7 @@ def subnet(cfg):
     data = datamodule(**cfg.datamodule)
     optimizer_fn = partial_instantiate(cfg.optimizer)
     scheduler_fn = partial_instantiate(cfg.scheduler)
-    train_loss = instantiate(cfg.loss)
+    train_loss = create_loss(cfg)
 
     logger.info("Bringing the network into the mask optimization state.")
     hydrate(network, **cfg.hydrate)

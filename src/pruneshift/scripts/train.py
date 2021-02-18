@@ -7,6 +7,7 @@ from hydra.utils import call
 from pruneshift.scripts.utils import create_trainer
 from pruneshift.scripts.utils import save_config
 from pruneshift.scripts.utils import partial_instantiate
+from pruneshift.scripts.utils import create_loss
 from pruneshift.datamodules import datamodule
 from pruneshift.modules import VisionModule
 
@@ -17,11 +18,11 @@ def train(cfg):
     save_config(cfg)
     trainer = create_trainer(cfg)
     # Currently we should initialize the trainer first because of the seed.
-    network = call(cfg.network)
+    network = call(cfg.network, protect_classifier_fn=None)
     data = datamodule(**cfg.datamodule)
     optimizer_fn = partial_instantiate(cfg.optimizer)
     scheduler_fn = partial_instantiate(cfg.scheduler)
-    train_loss = instantiate(cfg.loss)
+    train_loss = create_loss(cfg)
 
     module = VisionModule(network=network,
                           test_labels=data.labels,
@@ -29,7 +30,8 @@ def train(cfg):
                           scheduler_fn=scheduler_fn,
                           train_loss=train_loss)
 
-    trainer.fit(module, datamodule=data)
+    if cfg.trainer.max_epochs > 0:
+        trainer.fit(module, datamodule=data)
     trainer.test(module, datamodule=data)
 
 

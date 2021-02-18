@@ -1,0 +1,12 @@
+defaults:
+    - path: standard
+    - network: standard 
+    - datamodule: cifar100
+    - trainer: standard
+
+datamodule:
+    with_idx: True
+
+save_path:
+
+seed: 0

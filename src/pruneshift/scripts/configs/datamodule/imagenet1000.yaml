@@ -2,10 +2,10 @@
 
 datamodule:
     name: imagenet_corrupted 
-    root: ${path.imagenet100}
+    root: ${path.imagenet1000}
     num_workers: 4
     batch_size: 1024
 
 network:
-    num_classes: 100
+    num_classes: 1000
     group: imagenet 

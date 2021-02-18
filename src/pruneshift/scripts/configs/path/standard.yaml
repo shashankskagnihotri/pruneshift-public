@@ -6,6 +6,8 @@ path:
     dataset: ${env:DATASET_PATH}
     model: ${env:MODEL_PATH}/standard/
     imagenet100: /misc/scratchSSD2/datasets/ILSVRC2012-100
+    imagenet200: /misc/scratchSSD2/datasets/ILSVRC2012-200
+    imagenet1000: /misc/scratchSSD2/datasets/ILSVRC2012
 
 hydra:
     run:

@@ -5,6 +5,7 @@ defaults:
     - network: pretrained
     - trainer: standard
     - scheduler: cosine
+    - teacher: 
     - optimizer: sgd
     - datamodule: cifar100
 

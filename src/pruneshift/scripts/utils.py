@@ -10,6 +10,8 @@ from pytorch_lightning.loggers import TensorBoardLogger
 from pytorch_lightning.loggers import CSVLogger
 from pytorch_lightning.callbacks import LearningRateMonitor
 
+from pruneshift.teachers import create_teacher
+
 logger = logging.getLogger(__name__)
 
 
@@ -48,7 +50,10 @@ def create_trainer(cfg: DictConfig):
     tb_logger = TensorBoardLogger(path, name="tensorboard", version="")
     csv_logger = CSVLogger(path, name=None, version="")
     loggers = [tb_logger, csv_logger]
-    callbacks.append(instantiate(cfg.checkpoint, dirpath=path/"checkpoint"))
+
+    if "checkpoint" in cfg:
+        callbacks.append(instantiate(cfg.checkpoint, dirpath=path/"checkpoint"))
+
     # We also want to log the learning rate.
     callbacks.append(LearningRateMonitor("epoch"))
 
@@ -71,4 +76,12 @@ def create_trainer(cfg: DictConfig):
     check_batch_size(cfg, trainer)
 
     return trainer
+
+
+def create_loss(cfg: DictConfig):
+    if "teacher" in cfg:
+        teacher = create_teacher(**cfg.teacher)
+        return instantiate(cfg.loss, teacher=teacher)
+
+    return instantiate(cfg.loss)
 

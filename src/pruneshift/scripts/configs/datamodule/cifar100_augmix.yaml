@@ -1,8 +1,13 @@
-# @package _group_
+# @package _global_
 
-name: cifar100_augmix_corrupted
-root: ${path.dataset}
-num_workers: 10
-batch_size: 128
-no_jsd: False
+datamodule:
+    name: cifar100_augmix_corrupted
+    root: ${path.dataset}
+    num_workers: 10
+    batch_size: 128
+    no_jsd: False
+
+network:
+    num_classes: 100
+    group: cifar
 

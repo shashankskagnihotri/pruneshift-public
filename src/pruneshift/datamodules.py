@@ -13,9 +13,11 @@ import pytorch_lightning as pl
 
 from .datasets import CIFAR10C
 from .datasets import CIFAR100C
-from .datasets import ImageNet100C
+from .datasets import ImageNetC
 from .datasets import TransformWrapper
 from .datasets import SplitImageFolder
+from .batches import StandardBatchWrapper
+from .batches import AugmixBatchWrapper
 from augmix.dataset import AugMixWrapper
 
 
@@ -39,6 +41,8 @@ def datamodule(
         num_workers: Number of workers used for the dataloaders.
         val_split: Amount of samples that should be used for the validation set.
             If None the test set becomes the validation set.
+        val_swap: Whether to swap the train with the val set.
+
     Returns:
         The corresponding LightningDataModule.
     """
@@ -49,7 +53,7 @@ def datamodule(
         num_workers=num_workers,
         val_split=val_split,
         val_swap=val_swap,
-        **kwargs
+        **kwargs,
     )
 
 
@@ -105,16 +109,17 @@ class BaseDataModule(pl.LightningDataModule):
         if stage == "fit":
             transform = [self.preprocessor(), self.preprocessor(False)]
             train_dataset, val_dataset = self.create_dataset("fit", transform)
-            self.train_dataset = TransformWrapper(train_dataset, self.normalizer())
-            self.val_dataset = TransformWrapper(val_dataset, self.normalizer())
+            self.train_dataset = TransformWrapper(train_dataset, self.normalizer(), with_idx=True)
+            self.val_dataset = TransformWrapper(val_dataset, self.normalizer(), with_idx=True)
+
         if stage == "test":
             test_datasets = self.create_dataset("test", self.preprocessor(False))
             assert isinstance(test_datasets, list)
             self.test_dataset = [
-                TransformWrapper(d, self.normalizer()) for d in test_datasets
+                TransformWrapper(d, self.normalizer(), with_idx=True) for d in test_datasets
             ]
 
-    def _create_dataloader(self, dataset, shuffle=False):
+    def _create_dataloader(self, dataset, train=False):
         if isinstance(dataset, (tuple, list)):
             # If not a dataset we assume a list/tuple of datasets.
             return [self._create_dataloader(d) for d in dataset]
@@ -124,7 +129,7 @@ class BaseDataModule(pl.LightningDataModule):
             batch_size=self.batch_size,
             num_workers=self.num_workers,
             pin_memory=True,
-            shuffle=shuffle,
+            shuffle=train,
         )
 
     def train_dataloader(self):
@@ -138,17 +143,19 @@ class BaseDataModule(pl.LightningDataModule):
 
 
 class AugmixDataModule(BaseDataModule):
+
     def __init__(self, no_jsd=False, **kwargs):
         super(AugmixDataModule, self).__init__(**kwargs)
         self.no_jsd = no_jsd
-
 
     def create_dataset(self, mode: str, transform=None):
         if mode == "test":
             return super(AugmixDataModule, self).create_dataset(mode, transform)
 
         datasets = super(AugmixDataModule, self).create_dataset(mode, transform)
-        train_dataset = AugMixWrapper(datasets[0], self.normalizer(), no_jsd=self.no_jsd)
+        train_dataset = AugMixWrapper(
+            datasets[0], self.normalizer(), no_jsd=self.no_jsd
+        )
 
         return train_dataset, datasets[1]
 
@@ -157,19 +164,18 @@ class AugmixDataModule(BaseDataModule):
             transform = [self.preprocessor(), self.preprocessor(False)]
             train_dataset, val_dataset = self.create_dataset("fit", transform)
             # Only difference, we do not need to normalize as this is done by the augment wrapper!
-            self.train_dataset = train_dataset
-            self.val_dataset = TransformWrapper(val_dataset, self.normalizer())
+            self.train_dataset = TransformWrapper(train_dataset, None, with_idx=True)
+            self.val_dataset = TransformWrapper(val_dataset, self.normalizer(), with_idx=True)
+
         if stage == "test":
             test_datasets = self.create_dataset("test", self.preprocessor(False))
             assert isinstance(test_datasets, list)
             self.test_dataset = [
-                TransformWrapper(d, self.normalizer()) for d in test_datasets
+                TransformWrapper(d, self.normalizer(), with_idx=True) for d in test_datasets
             ]
 
 
 class CorruptedDataModule(BaseDataModule):
-
-    corr_dataset_cls = None
 
     def __init__(self, lvls=None, **kwargs):
         super(CorruptedDataModule, self).__init__(**kwargs)
@@ -238,7 +244,7 @@ class CIFAR10Module(BaseDataModule):
 
     def preprocessor(self, train: bool = True):
         if not train:
-            return None 
+            return None
 
         return transforms.Compose(
             [
@@ -255,8 +261,8 @@ class CIFAR100Module(CIFAR10Module):
     cifar_cls = torch_datasets.CIFAR100
 
 
-class ImageNet100Module(BaseDataModule):
-    name = "imagenet100"
+class ImageNetModule(BaseDataModule):
+    name = "imagenet"
     mean = (0.485, 0.456, 0.406)
     std = (0.229, 0.224, 0.225)
 
@@ -272,8 +278,12 @@ class ImageNet100Module(BaseDataModule):
                 val_dataset = TransformWrapper(val_dataset, transform[1])
                 return train_dataset, val_dataset
             else:
-                train_dataset = ImageFolder(Path(self.root) / "train", transform=transform[0])
-                val_dataset = ImageFolder(Path(self.root) / "val", transform=transform[1])
+                train_dataset = ImageFolder(
+                    Path(self.root) / "train", transform=transform[0]
+                )
+                val_dataset = ImageFolder(
+                    Path(self.root) / "val", transform=transform[1]
+                )
                 return train_dataset, val_dataset
 
         return [ImageFolder(Path(self.root) / "val", transform)]
@@ -291,6 +301,24 @@ class ImageNet100Module(BaseDataModule):
         return transforms.Compose(ts)
 
 
+class ImageNetRenditionModule(ImageNetModule):
+    name = "imagenet_renditions"
+
+    def create_dataset(self, stage: str, transform=None):
+        if stage == "fit":
+            return super(ImageNetRenditionModule, self).create_dataset(stage, transform)
+
+        datasets = super(ImageNetRenditionModule, self).create_dataset(stage, transform)
+
+        datasets.append(ImageFolder(Path(self.root) / "renditions", transform))
+
+        return datasets
+
+    @property
+    def labels(self):
+        return ["clean", "rendition"]
+
+
 class CIFAR10AugmixModule(AugmixDataModule, CIFAR10Module):
     name = "cifar10_augmix"
 
@@ -299,8 +327,8 @@ class CIFAR100AugmixModule(AugmixDataModule, CIFAR100Module):
     name = "cifar100_augmix"
 
 
-class ImageNet100AugmixModule(AugmixDataModule, ImageNet100Module):
-    name = "imagenet100_augmix"
+class ImageNetAugmixModule(AugmixDataModule, ImageNetModule):
+    name = "imagenet_augmix"
 
 
 class CIFAR10CModule(CorruptedDataModule, CIFAR10Module):
@@ -313,9 +341,9 @@ class CIFAR100CModule(CorruptedDataModule, CIFAR100Module):
     corr_dataset_cls = CIFAR100C
 
 
-class ImageNet100CModule(CorruptedDataModule, ImageNet100Module):
-    name = "imagenet100_corrupted"
-    corr_dataset_cls = ImageNet100C
+class ImageNetCModule(CorruptedDataModule, ImageNetModule):
+    name = "imagenet_corrupted"
+    corr_dataset_cls = ImageNetC
 
 
 class CIFAR10AugmixCModule(AugmixDataModule, CIFAR10CModule):
@@ -326,6 +354,5 @@ class CIFAR100AugmixCModule(AugmixDataModule, CIFAR100CModule):
     name = "cifar100_augmix_corrupted"
 
 
-class ImageNet100AugmixCModule(AugmixDataModule, ImageNet100CModule):
-    name = "imagenet100_augmix_corrupted"
-
+class ImageNetAugmixCModule(AugmixDataModule, ImageNetCModule):
+    name = "imagenet_augmix_corrupted"

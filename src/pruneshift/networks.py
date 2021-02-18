@@ -10,18 +10,21 @@ from functools import partial
 import re
 from pathlib import Path
 from typing import Callable
+from typing import Optional
 import logging
 
+import numpy as np
 import torch
 import torch.nn as nn
 import torchvision.models as imagenet_models
 import pytorch_lightning as pl
 
 from .utils import safe_ckpt_load
+from pruneshift.batches import StandardBatch
+from pruneshift.batches import AugmixBatch
 import cifar10_models as cifar_models
 import pytorch_resnet_cifar10.resnet as cifar_resnet
 import models as models
-
 
 
 logger = logging.getLogger(__name__)
@@ -30,6 +33,148 @@ logger = logging.getLogger(__name__)
 NETWORK_REGEX = re.compile(
     r"(?P<group>[a-zA-Z]+)(?P<num_classes>[0-9]+)_(?P<name>[a-zA-Z0-9_]+)"
 )
+
+
+def protect_classifier(name: str, network: nn.Module):
+    """ Defines which layers are protected. """
+    if name[:6] == "resnet":
+        if hasattr(network, "linear"):
+            network.linear.is_protected = True
+        else:
+            network.fc.is_protected = True
+    elif name[:3] == "vgg":
+        network.classifier[-1].is_protected = True
+    elif name[:8] == "densenet":
+        network.classifier.is_protected = True
+    else:
+        raise NotImplementedError
+
+
+def create_network(
+    group: str,
+    name: str,
+    num_classes: int,
+    ckpt_path: str = None,
+    model_path: str = None,
+    version: int = None,
+    protect_classifier_fn: Optional[Callable] = protect_classifier,
+    download: bool = False,
+    imagenet_subset: Optional[bool] = None,
+    **kwargs,
+):
+    """A function creating networks.
+
+    Args:
+        group: The dataset group eg. imagenet, cifar.
+        name: The name of model architecture.
+        num_classes: The number of classes.
+        ckpt_path: Direct path o a checkpoint of a network or activation
+            database.
+        model_path: Directory to find checkpoints in.
+        version: Version of the checkpoint.
+        protect_classifier_fn: Function that marks classifiers for
+            protectionfrom pruning.
+        download: Whether to download a model from torchvision. Only
+            possible for imagenet1000.
+        imagenet_subset: Whether the model should adjust activations for
+            different ordered imagenet subsets. Note that when using a
+            downloaded model, with fewer classes, this is done automati-
+            cally.
+
+    Returns:
+        The desired network.
+    """
+    logger.info(f"Creating network {name} for {group} with {num_classes} classes.")
+
+    # 2. Find the right factory function for the network.
+
+    # Resolve the path
+    path = _resolve_path(group, name, num_classes, ckpt_path, model_path, version)
+
+    if group == "cifar":
+        if name[:6] == "resnet":
+            network_fn = getattr(models, name)
+        else:
+            network_fn = getattr(models, name)
+    elif group == "imagenet":
+        network_fn = getattr(imagenet_models, name)
+    else:
+        raise ValueError(f"Unknown group {group}.")
+
+    # 3. Create the network and potentially load a checkpoint.
+    if download:
+        kwargs["pretrained"] = True
+
+    subset_wrap = imagenet_subset
+    create_num_classes = num_classes
+
+    if (
+        download
+        and group == "imagenet"
+        and num_classes != 1000
+        and imagenet_subset is None
+        or imagenet_subset
+    ):
+        subset_wrap = True
+        create_num_classes = 1000
+
+    network = network_fn(num_classes=create_num_classes, **kwargs)
+
+    if path is not None and group != "dataset":
+        safe_ckpt_load(network, path)
+
+    # 4. Adjust network with addtional wrappers, hooks and etc.
+    # Protect classifier layers from pruning.
+    if protect_classifier_fn is not None:
+        protect_classifier_fn(name, network)
+
+    # When downloaded we change the label scheme from the activations..
+    if subset_wrap:
+        logger.info(f"Adopting network from imagenet1000 to imagenet{num_classes}.")
+        network = ImagenetSubsetWrapper(network, num_classes)
+
+    # Add a reset hook for lottery style pruning.
+    add_reset_hook(
+        network,
+        partial(create_network, group=group, name=name, num_classes=num_classes),
+        version,
+    )
+
+    return network
+
+
+class ImagenetSubsetWrapper(nn.Module):
+    """Changes predictions for models trained on imagenet to a subset."""
+
+    def __init__(
+        self,
+        network: nn.Module,
+        num_classes: int,
+        root: str = None,
+        super_root: str = None,
+    ):
+        super(ImagenetSubsetWrapper, self).__init__()
+        root = f"/misc/scratchSSD2/datasets/ILSVRC2012-{num_classes}/train"
+        super_root = "/misc/scratchSSD2/datasets/ILSVRC2012/train"
+        self.num_classes = num_classes
+        self.root = root
+        self.super_root = super_root
+        self.network = network
+        self.perm = self.calculate_permutation()
+
+    def calculate_permutation(self):
+        class_dirs = sorted([p.stem for p in Path(self.root).iterdir()])
+        super_class_dirs = sorted([p.stem for p in Path(self.super_root).iterdir()])
+
+        # The first part contains the class indices of the subset.
+        perm = [super_class_dirs.index(cd) for cd in class_dirs]
+        # The second part contains the class indices not in the subset.
+        perm.extend(set(range(len(super_class_dirs))) - set(perm))
+        return torch.tensor(perm)
+
+    def forward(self, x):
+        return self.network(x)[..., self.perm[: self.num_classes]]
+
 
 def add_reset_hook(network: nn.Module, network_factory: Callable, version=0):
     """ Adds a reset option to a network, usable for lottery ticket stuff."""
@@ -43,91 +188,18 @@ def add_reset_hook(network: nn.Module, network_factory: Callable, version=0):
     network.__reset_hook = reset_hook
 
 
-def protect_classifier(name: str, network: nn.Module):
-    """ Defines which layers are protected. """
-    if name[: 6] == "resnet":
-        if hasattr(network, "linear"):
-            network.linear.is_protected = True
-        else:
-            network.fc.is_protected = True
-    elif name[: 3] == "vgg":
-        network.classifier[-1].is_protected = True
-    elif name[: 8] == "densenet":
-        network.classifier.is_protected = True
-
-    else:
-        raise NotImplementedError
-
-
-def load_checkpoint(
-    network: nn.Module,
-    network_id: str,
-    ckpt_path: str = None,
-    model_path: str = None,
-    version: int = None
+def _resolve_path(
+    group: str,
+    name: str,
+    num_classes: int,
+    ckpt_path: str,
+    model_path: str,
+    version: int,
 ):
-    """Loads a checkpoint."""
-
     if ckpt_path is not None:
-        path = Path(ckpt_path)
-    else:
+        return Path(ckpt_path)
+    elif model_path is not None:
         version = 0 if version is None else version
-        path = Path(model_path) / f"{network_id}.{version}"
-    safe_ckpt_load(network, path)
+        return Path(model_path) / f"{group}{num_classes}_{name}.{version}"
 
-
-def create_network(
-    network_id: str,
-    ckpt_path: str = None,
-    model_path: str = None,
-    version: int = None,
-    **kwargs
-):
-    """A function creating common networks for either CIFAR10 and ImageNet
-
-    Args:
-        network_id: For example cifar10_resnet50.
-        ckpt_path: Direct path o a checkpoint of a network.
-        model_path: Directory to find checkpoints in.
-        version: Version of the checkpoint.
-    Returns:
-        The desired network.
-    """
-
-    match = NETWORK_REGEX.match(network_id)
-
-    if match is None:
-        msg = (
-            f"Network Id {network_id} does not match the network regex {NETWORK_REGEX}."
-        )
-        raise ValueError(msg)
-
-    group = match.group("group")
-    num_classes = int(match.group("num_classes"))
-    name = match.group("name")
-
-    logger.info(f"Creating Network {name} for {group} with {num_classes} classes.")
-
-    if group == "cifar":
-        if name[: 6] == "resnet":
-            network_fn = getattr(models, name)
-        else:
-            network_fn = getattr(models, name)
-    elif group == "imagenet":
-        network_fn = getattr(imagenet_models, name)
-    else:
-        raise ValueError(f"Unknown group {group}.")
-
-    network = network_fn(num_classes=num_classes, **kwargs)
-
-    # We also want to have the classifier protected from pruning.
-    protect_classifier(name, network)
-
-    if ckpt_path is not None or model_path is not None:
-        load_checkpoint(network, network_id, ckpt_path, model_path, version)
-
-    # Add a reset hook for lottery style shemes.
-    add_reset_hook(network, partial(create_network, network_id), version)
-
-    return network
-
+    return None

@@ -95,8 +95,10 @@ class VisionModule(pl.LightningModule):
         )
 
     def test_step(self, batch, batch_idx, dataset_idx=0):
-        x, y = batch
-        self.test_acc[self.test_labels[dataset_idx]](y, torch.argmax(self(x), -1))
+        idx, x, y = batch
+        self.test_acc[self.test_labels[dataset_idx]](
+            y, torch.argmax(self(x), -1)
+        )
 
     def test_epoch_end(self, outputs):
         values = {}
@@ -111,7 +113,7 @@ class VisionModule(pl.LightningModule):
 
         # Caluclate the mean corruption error.
         non_clean = [acc for l, acc in values.items() if l != "test_acc_clean"]
-        self.log("test_mCE", 1 - torch.tensor(non_clean).mean()) 
+        self.log("test_mCE", 1 - torch.tensor(non_clean).mean())
 
     def configure_optimizers(self):
         if self.optimizer_fn is None:
@@ -164,4 +166,3 @@ class PrunedModule(VisionModule):
     #         optimizers, lr_schedulers = self.configure_optimizers()
     #         self.trainer.optimizers = optimizers
     #         self.trainer.lr_schedulers = lr_schedulers
-

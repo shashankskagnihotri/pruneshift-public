@@ -1,11 +1,12 @@
 # @package _global_
 
 datamodule:
-    name: imagenet_corrupted 
+    name: imagenet_renditions
     root: ${path.imagenet100}
     num_workers: 4
-    batch_size: 1024
+    batch_size: 128
 
 network:
     num_classes: 100
-    group: imagenet 
+    group: imagenet
+
