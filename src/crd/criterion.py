@@ -12,21 +12,21 @@ class CRDLoss(nn.Module):
     (b) using student as anchor, choose positive and negatives over the teacher side
 
     Args:
-        opt.s_dim: the dimension of student's feature
-        opt.t_dim: the dimension of teacher's feature
-        opt.feat_dim: the dimension of the projection space
-        opt.nce_k: number of negatives paired with each positive
-        opt.nce_t: the temperature
-        opt.nce_m: the momentum for updating the memory buffer
-        opt.n_data: the number of samples in the training set, therefor the memory buffer is: opt.n_data x opt.feat_dim
+        opt[0]: the dimension of student's feature
+        opt[1]: the dimension of teacher's feature
+        opt[3]: the dimension of the projection space
+        opt[4]: number of negatives paired with each positive
+        opt[5]: the temperature
+        opt[6]: the momentum for updating the memory buffer
+        opt[2]: the number of samples in the training set, therefor the memory buffer is: opt[2] x opt[3]
     """
     def __init__(self, opt):
         super(CRDLoss, self).__init__()
-        self.embed_s = Embed(opt.s_dim, opt.feat_dim)
-        self.embed_t = Embed(opt.t_dim, opt.feat_dim)
-        self.contrast = ContrastMemory(opt.feat_dim, opt.n_data, opt.nce_k, opt.nce_t, opt.nce_m)
-        self.criterion_t = ContrastLoss(opt.n_data)
-        self.criterion_s = ContrastLoss(opt.n_data)
+        self.embed_s = Embed(opt[0], opt[3])
+        self.embed_t = Embed(opt[1], opt[3])
+        self.contrast = ContrastMemory(opt[3], opt[2], opt[4], opt[5], opt[6])
+        self.criterion_t = ContrastLoss(opt[2])
+        self.criterion_s = ContrastLoss(opt[2])
 
     def forward(self, f_s, f_t, idx, contrast_idx=None):
         """
@@ -54,14 +54,14 @@ class ContrastLoss(nn.Module):
     """
     def __init__(self, n_data):
         super(ContrastLoss, self).__init__()
-        self.n_data = n_data
+        self[2] = n_data
 
     def forward(self, x):
         bsz = x.shape[0]
         m = x.size(1) - 1
 
         # noise distribution
-        Pn = 1 / float(self.n_data)
+        Pn = 1 / float(self[2])
 
         # loss for positive pair
         P_pos = x.select(1, 0)
