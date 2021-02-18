@@ -20,8 +20,6 @@ import torchvision.models as imagenet_models
 import pytorch_lightning as pl
 
 from .utils import safe_ckpt_load
-from pruneshift.batches import StandardBatch
-from pruneshift.batches import AugmixBatch
 import cifar10_models as cifar_models
 import pytorch_resnet_cifar10.resnet as cifar_resnet
 import models as models

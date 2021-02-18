@@ -16,8 +16,6 @@ from .datasets import CIFAR100C
 from .datasets import ImageNetC
 from .datasets import TransformWrapper
 from .datasets import SplitImageFolder
-from .batches import StandardBatchWrapper
-from .batches import AugmixBatchWrapper
 from augmix.dataset import AugMixWrapper
 
 
