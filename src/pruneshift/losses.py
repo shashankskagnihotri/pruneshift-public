@@ -86,7 +86,7 @@ class AugmixKnowledgeDistill(nn.Module):
             teacher_logits = self.teacher(idx, comb_x)
 
         loss_kd = criterion_dv(kd_logits, teacher_logits) * self.charlie
-        logits = torch.split(kd_logits, logits.shape[0] // 3)
+        logits = torch.split(kd_logits, kd_logits.shape[0] // 3)
 
         p_clean, p_aug1, p_aug2 = (
             F.softmax(logits[0], dim=1),
