@@ -50,8 +50,8 @@ class BasicBlock(nn.Module):
         groups: int = 1,
         base_width: int = 64,
         dilation: int = 1,
-        is_last: bool = False,
-        norm_layer: Optional[Callable[..., nn.Module]] = None
+        norm_layer: Optional[Callable[..., nn.Module]] = None,
+        is_last: bool = False
     ) -> None:
         super(BasicBlock, self).__init__()
         if norm_layer is None:
@@ -239,8 +239,9 @@ class ResNet(nn.Module):
             )
 
         layers = []
+        #print("blocks==1: ", (blocks==1))
         layers.append(block(self.inplanes, planes, stride, downsample, self.groups,
-                            self.base_width, previous_dilation, norm_layer, is_last=(blocks ==1)))
+                            self.base_width, previous_dilation, norm_layer, is_last=(blocks == 1)))
         self.inplanes = planes * block.expansion
         for i in range(1, blocks):
             layers.append(block(self.inplanes, planes, groups=self.groups,
@@ -275,6 +276,8 @@ class ResNet(nn.Module):
     
     def _forward_impl(self, x: Tensor) -> Tensor:
         # See note [TorchScript super()]
+        is_feat = True
+        preact = False
         x = self.conv1(x)
         x = self.bn1(x)
         x = self.relu(x)

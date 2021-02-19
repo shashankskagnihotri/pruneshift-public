@@ -166,7 +166,7 @@ class AugmixLoss(nn.Module):
         
 
 class CRD_Loss(nn.Module):
-    def __init__(self, teacher_path,
+    def __init__(self, teacher:Teacher, teacher_path,
         teacher_model_id, kd_T: float = 4.,
         gamma:float = 0.1, charlie:float = 0.1,
         delta: float = 0.8, feat_dim: int=128, 
@@ -248,15 +248,16 @@ class CRD_Loss(nn.Module):
         return loss+loss_kd+loss_crd , stats
         
 class Augmix_CRD_Loss(nn.Module):
-    def __init__(self, teacher_path, teacher_model_id,
+    def __init__(self, teacher:Teacher, teacher_path, teacher_model_id,
         kd_T: float = 4., alpha:float=12., gamma:float = 0.1,
         charlie:float = 0.1, delta: float = 0.8,
         feat_dim: int=128, nce_k:int= 16384,
         nce_t:int=0.07, nce_m:int= 0.5,
-        percent:float=1.0, mode:str='exact'):
+        percent:float=1.0, mode:str='exact', k=4096):
         
         super(Augmix_CRD_Loss, self).__init__()
-        self.teacher_network = create_network(teacher_model_id, ckpt_path=teacher_path)
+        #self.teacher_network = create_network(teacher_model_id, ckpt_path=teacher_path)
+        self.teacher=teacher
         self.kd_T = kd_T 	 	#temperature for KD
         self.alpha = alpha		#scaling for the augmix loss
         self.gamma = gamma 	 	#scaling for the classification loss
@@ -268,6 +269,7 @@ class Augmix_CRD_Loss(nn.Module):
         self.nce_m = nce_m		#the momentum for updating the memory buffer
         self.percent = percent
         self.mode = mode
+        self.k=k
 
     def forward(self, network: nn.Module, batch):
         preact = False
@@ -276,6 +278,8 @@ class Augmix_CRD_Loss(nn.Module):
         
         percent = self.percent
         label = y
+        target = y
+        target.cpu().detach()
         num_samples = len(x) 
         
         self.cls_positive = [[] for i in range(num_classes)]
@@ -301,7 +305,7 @@ class Augmix_CRD_Loss(nn.Module):
         self.cls_negative = np.asarray(self.cls_negative)
         
         if self.mode == 'exact':
-            pos_idx = index
+            pos_idx = idx
         elif self.mode == 'relax':
             pos_idx = np.random.choice(self.cls_positive[target], 1)
             pos_idx = pos_idx[0]
@@ -314,10 +318,11 @@ class Augmix_CRD_Loss(nn.Module):
 
         comb_x = torch.cat(x)
         
-        feat_s, logit_s = network(x, is_feat=True, preact=preact)
+        feat_s, logit_s = network(x)
         self.teacher_network.eval()
         with torch.no_grad():
-            feat_t, logit_t = self.teacher_network(idx, comb_x, is_feat=True, preact=preact)
+            #feat_t, logit_t = self.teacher_network(idx, comb_x, is_feat=True, preact=preact)
+            feat_t, logit_t = self.teacher(idx, comb_x)
             feat_t = [f.detach() for f in feat_t]
         f_s = feat_s[-1]
         f_t = feat_t[-1]

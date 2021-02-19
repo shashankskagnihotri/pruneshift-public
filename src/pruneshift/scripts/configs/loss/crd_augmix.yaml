@@ -2,7 +2,6 @@
 
 _target_: pruneshift.losses.Augmix_CRD_Loss
 alpha: 12.
-beta: 0.1
 kd_T: 4.
 charlie: 0.1
 delta: 0.8
@@ -16,3 +15,4 @@ teacher_path: "/misc/lmbraid19/agnihotr/thesis_pruneshift/2021-02-16/02-30-32/ch
 
 percent: 1.0
 mode: 'exact'
+k: 4096
