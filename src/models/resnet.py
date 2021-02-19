@@ -61,6 +61,7 @@ class BasicBlock(nn.Module):
         if dilation > 1:
             raise NotImplementedError("Dilation > 1 not supported in BasicBlock")
         # Both self.conv1 and self.downsample layers downsample the input when stride != 1
+        self.is_last = is_last
         self.conv1 = conv3x3(inplanes, planes, stride)
         self.bn1 = norm_layer(planes)
         self.relu1 = nn.ReLU(inplace=True)
@@ -111,7 +112,7 @@ class Bottleneck(nn.Module):
         groups: int = 1,
         base_width: int = 64,
         dilation: int = 1,
-        is_last: bool = False
+        is_last: bool = False,
         norm_layer: Optional[Callable[..., nn.Module]] = None
     ) -> None:
         super(Bottleneck, self).__init__()
@@ -119,6 +120,7 @@ class Bottleneck(nn.Module):
             norm_layer = nn.BatchNorm2d
         width = int(planes * (base_width / 64.)) * groups
         # Both self.conv2 and self.downsample layers downsample the input when stride != 1
+        self.is_last = is_last
         self.conv1 = conv1x1(inplanes, width)
         self.bn1 = norm_layer(width)
         self.conv2 = conv3x3(width, width, stride, groups, dilation)
@@ -238,12 +240,12 @@ class ResNet(nn.Module):
 
         layers = []
         layers.append(block(self.inplanes, planes, stride, downsample, self.groups,
-                            self.base_width, previous_dilation, is_last=(blocks ==1), norm_layer))
+                            self.base_width, previous_dilation, norm_layer, is_last=(blocks ==1)))
         self.inplanes = planes * block.expansion
         for i in range(1, blocks):
             layers.append(block(self.inplanes, planes, groups=self.groups,
-                                base_width=self.base_width, dilation=self.dilation,
-                                is_last=(i == blocks-1), norm_layer=norm_layer))
+                                base_width=self.base_width, dilation=self.dilation, norm_layer=norm_layer,
+                                is_last=(i == blocks-1)))
 
         return nn.Sequential(*layers)
 
