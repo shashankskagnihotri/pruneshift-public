@@ -16,7 +16,10 @@ from pruneshift.teachers import Teacher
 class StandardLoss(nn.Module):
     def forward(self, network: nn.Module, batch):
         idx, x, y = batch
-        logits = network(x)
+        _, logits = network(x)
+        #import ipdb;ipdb.set_trace()
+        #print(y.__class__)
+        #print(logits.__class__)
         loss = F.cross_entropy(logits, y)
         acc = accuracy(torch.argmax(logits, 1), y)
         return loss, {"acc": acc}
@@ -38,13 +41,13 @@ class KnowledgeDistill(nn.Module):
 
     def forward(self, network: nn.Module, batch):
         idx, x, y = batch
-        logits = network(x)
+        _, logits = network(x)
         # print("\n\n\n\n")
         # print(logits)
         criterion_dv = DistillKL(self.kd_T)
         self.teacher.eval()
         with torch.no_grad():
-            teacher_logits = self.teacher(idx, x)
+            _ ,teacher_logits = self.teacher(idx, x)
         loss = F.cross_entropy(logits, y) * self.gamma
         loss_kd = criterion_dv(logits, teacher_logits) * self.charlie
         acc = accuracy(torch.argmax(logits, 1), y)
@@ -81,9 +84,9 @@ class AugmixKnowledgeDistill(nn.Module):
         self.teacher.eval()
         criterion_dv = DistillKL(self.kd_T)
 
-        kd_logits = network(comb_x)
+        _, kd_logits = network(comb_x)
         with torch.no_grad():
-            teacher_logits = self.teacher(idx, comb_x)
+            _, teacher_logits = self.teacher(idx, comb_x)
 
         loss_kd = criterion_dv(kd_logits, teacher_logits) * self.charlie
         logits = torch.split(kd_logits, kd_logits.shape[0] // 3)
@@ -138,7 +141,7 @@ class AugmixLoss(nn.Module):
     def forward(self, network: nn.Module, batch):
         idx, x, y = batch
 
-        logits = network(torch.cat(x))
+        _, logits = network(torch.cat(x))
         logits = torch.split(logits, logits.shape[0] // 3)
 
         p_clean, p_aug1, p_aug2 = (
@@ -174,7 +177,8 @@ class CRD_Loss(nn.Module):
         percent:float=1.0, mode:str='exact'):
         
         super(CRD_Loss, self).__init__()
-        self.teacher_network = create_network(teacher_model_id, ckpt_path=teacher_path)
+        self.teacher = teacher
+        #self.teacher_network = create_network(teacher_model_id, ckpt_path=teacher_path)
         self.kd_T = kd_T 	 	#temperature for KD
         self.gamma = gamma 	 	#scaling for the classification loss
         self.charlie = charlie  	#scaling for the KD loss
@@ -183,6 +187,7 @@ class CRD_Loss(nn.Module):
         self.nce_k = nce_k		#number of negatives paired with each positive
         self.nce_t = nce_t		#the temperature
         self.nce_m = nce_m		#the momentum for updating the memory buffer
+        self.feat_dim=feat_dim
         self.percent = percent
         self.mode = mode
 
@@ -193,6 +198,7 @@ class CRD_Loss(nn.Module):
         percent = self.percent
         label = y
         num_samples = len(x) 
+        feat_dim = self.feat_dim
         
         self.cls_positive = [[] for i in range(num_classes)]
         for i in range(num_samples):
@@ -217,7 +223,7 @@ class CRD_Loss(nn.Module):
         self.cls_negative = np.asarray(self.cls_negative)
         
         if self.mode == 'exact':
-            pos_idx = index
+            pos_idx = idx
         elif self.mode == 'relax':
             pos_idx = np.random.choice(self.cls_positive[target], 1)
             pos_idx = pos_idx[0]
@@ -229,17 +235,19 @@ class CRD_Loss(nn.Module):
         criterion_dv = DistillKL(self.kd_T)
 
         feat_s, logit_s = network(x, is_feat=True, preact=preact)
-        self.teacher_network.eval()
+        #self.teacher_network.eval()
+        self.teacher.eval()
         with torch.no_grad():
-            feat_t, logit_t = self.teacher_network(idx, x, is_feat=True, preact=preact)
+            #feat_t, logit_t = self.teacher_network(idx, x, is_feat=True, preact=preact)
+            feat_t, logit_t = self.teacher(idx, x, is_feat=True, preact=preact)
             feat_t = [f.detach() for f in feat_t]
         f_s = feat_s[-1]
         f_t = feat_t[-1]
         s_dim = feat_s[-1].shape[1]
         t_dim = feat_t[-1].shape[1]
         n_data = len(x.cpu().detach().numpy())
-        criterion_kd = CRDLoss([s_dim, t_dim, n_data, feat_dim, nce_k, nce_m, nce_m])
-        loss_crd = criterion_kd(f_s, f_t, idx, constract_idx) * self.delta
+        criterion_kd = CRDLoss([s_dim, t_dim, n_data, feat_dim, self.nce_k, self.nce_t, self.nce_m])
+        loss_crd = criterion_kd(f_s, f_t, idx, constrast_idx) * self.delta
         loss = F.cross_entropy(logits, y) * self.gamma
         loss_kd = criterion_dv(logits, teacher_logits) * self.charlie
         acc = accuracy(torch.argmax(logits, 1), y)
@@ -279,8 +287,9 @@ class Augmix_CRD_Loss(nn.Module):
         percent = self.percent
         label = y
         target = y
-        target.cpu().detach()
+        target = target.cpu().detach().numpy()
         num_samples = len(x) 
+        feat_dim = self.feat_dim
         
         self.cls_positive = [[] for i in range(num_classes)]
         for i in range(num_samples):
@@ -317,20 +326,25 @@ class Augmix_CRD_Loss(nn.Module):
         criterion_dv = DistillKL(self.kd_T)
 
         comb_x = torch.cat(x)
-        
-        feat_s, logit_s = network(x)
-        self.teacher_network.eval()
+        network.eval()
+        feat_s, _ = network(comb_x)
+        network.train()
+        _, logit_s = network(comb_x)
+        feat_s = [f.detach() for f in feat_s]
+        #self.teacher_network.eval()
+        self.teacher.eval()
         with torch.no_grad():
             #feat_t, logit_t = self.teacher_network(idx, comb_x, is_feat=True, preact=preact)
             feat_t, logit_t = self.teacher(idx, comb_x)
-            feat_t = [f.detach() for f in feat_t]
+            feat_t = [f.cpu().detach() for f in feat_t]
         f_s = feat_s[-1]
         f_t = feat_t[-1]
         s_dim = feat_s[-1].shape[1]
         t_dim = feat_t[-1].shape[1]
-        n_data = len(x.cpu().detach().numpy())
-        criterion_kd = CRDLoss([s_dim, t_dim, n_data, feat_dim, nce_k, nce_m, nce_m])
-        loss_crd = criterion_kd(f_s, f_t, idx, constract_idx) * self.delta
+        n_data = len(comb_x.cpu().detach().numpy())
+
+        criterion_kd = CRDLoss([s_dim, t_dim, n_data, feat_dim, self.nce_k, self.nce_t, self.nce_m])
+        loss_crd = criterion_kd(f_s, f_t, idx, constrast_idx) * self.delta
                 
         loss_kd = criterion_dv(logit_s, logit_t) * self.charlie
         

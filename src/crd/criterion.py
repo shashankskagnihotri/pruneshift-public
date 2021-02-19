@@ -54,7 +54,7 @@ class ContrastLoss(nn.Module):
     """
     def __init__(self, n_data):
         super(ContrastLoss, self).__init__()
-        self[2] = n_data
+        self.n_data = n_data
 
     def forward(self, x):
         bsz = x.shape[0]
@@ -84,6 +84,10 @@ class Embed(nn.Module):
         self.l2norm = Normalize(2)
 
     def forward(self, x):
+        #print('\n\n\n\nx class: ', x.__class__)
+        #x.cuda()
+        #x.to('cuda:0')
+        print(x)
         x = x.view(x.shape[0], -1)
         x = self.linear(x)
         x = self.l2norm(x)

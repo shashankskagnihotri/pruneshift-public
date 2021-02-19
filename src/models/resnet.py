@@ -71,7 +71,7 @@ class BasicBlock(nn.Module):
         self.stride = stride
         self.relu2 = nn.ReLU(inplace=True)
 
-    def forward(self, x: Tensor) -> Tensor:
+    def forward(self, x: Tensor) :
         identity = x
         BasicBlock.counter += 1
 
