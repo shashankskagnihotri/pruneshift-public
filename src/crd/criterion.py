@@ -39,6 +39,7 @@ class CRDLoss(nn.Module):
         Returns:
             The contrastive loss
         """
+        print(f_s)
         f_s = self.embed_s(f_s)
         f_t = self.embed_t(f_t)
         out_s, out_t = self.contrast(f_s, f_t, idx, contrast_idx)
@@ -87,7 +88,8 @@ class Embed(nn.Module):
         #print('\n\n\n\nx class: ', x.__class__)
         #x.cuda()
         #x.to('cuda:0')
-        print(x)
+        #print(x)
+        x.detach()
         x = x.view(x.shape[0], -1)
         x = self.linear(x)
         x = self.l2norm(x)

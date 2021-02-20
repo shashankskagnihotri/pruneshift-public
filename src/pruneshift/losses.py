@@ -277,7 +277,7 @@ class Augmix_CRD_Loss(nn.Module):
         self.nce_m = nce_m		#the momentum for updating the memory buffer
         self.percent = percent
         self.mode = mode
-        self.k=k
+        self.k=k        
 
     def forward(self, network: nn.Module, batch):
         preact = False
@@ -330,20 +330,24 @@ class Augmix_CRD_Loss(nn.Module):
         feat_s, _ = network(comb_x)
         network.train()
         _, logit_s = network(comb_x)
-        feat_s = [f.detach() for f in feat_s]
+        #feat_s = [f.detach() for f in feat_s]
         #self.teacher_network.eval()
         self.teacher.eval()
         with torch.no_grad():
             #feat_t, logit_t = self.teacher_network(idx, comb_x, is_feat=True, preact=preact)
             feat_t, logit_t = self.teacher(idx, comb_x)
-            feat_t = [f.cpu().detach() for f in feat_t]
+            device = feat_t[0].device
+            feat_t = [f.detach() for f in feat_t]
         f_s = feat_s[-1]
         f_t = feat_t[-1]
+        #print(f_s)
+        #print(f_t.cuda(device=f_s.cuda(device)))
         s_dim = feat_s[-1].shape[1]
         t_dim = feat_t[-1].shape[1]
-        n_data = len(comb_x.cpu().detach().numpy())
+        n_data = len(comb_x.cpu().detach().numpy())        
 
-        criterion_kd = CRDLoss([s_dim, t_dim, n_data, feat_dim, self.nce_k, self.nce_t, self.nce_m])
+        
+        #criterion_kd.to(device)
         loss_crd = criterion_kd(f_s, f_t, idx, constrast_idx) * self.delta
                 
         loss_kd = criterion_dv(logit_s, logit_t) * self.charlie
