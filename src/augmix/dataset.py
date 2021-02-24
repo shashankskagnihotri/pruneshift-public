@@ -9,7 +9,7 @@ def aug(
     all_ops: bool = False,
     mixture_width: int = 3,
     mixture_depth: int = -1,
-    aug_severity: int = 1,
+    aug_severity: int = 3,
 ):
     """Perform AugMix augmentations and compute mixture.
 

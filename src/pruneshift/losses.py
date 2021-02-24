@@ -10,6 +10,7 @@ from pytorch_lightning.metrics.functional import accuracy
 from distiller_zoo import DistillKL
 from crd.criterion import CRDLoss
 from pruneshift.teachers import Teacher
+from torch.utils.data import DataLoader
 
 
     
@@ -261,7 +262,8 @@ class Augmix_CRD_Loss(nn.Module):
         charlie:float = 0.1, delta: float = 0.8,
         feat_dim: int=128, nce_k:int= 16384,
         nce_t:int=0.07, nce_m:int= 0.5,
-        percent:float=1.0, mode:str='exact', k=4096):
+        percent:float=1.0, mode:str='exact', k=4096,
+        s_dim=None, t_dim=None, n_data=None):
         
         super(Augmix_CRD_Loss, self).__init__()
         #self.teacher_network = create_network(teacher_model_id, ckpt_path=teacher_path)
@@ -277,8 +279,15 @@ class Augmix_CRD_Loss(nn.Module):
         self.nce_m = nce_m		#the momentum for updating the memory buffer
         self.percent = percent
         self.mode = mode
-        self.k=k        
+        self.k=k   
+        self.s_dim = s_dim
+        self.t_dim = t_dim
+        self.n_data = n_data      
+        self.criterion_kd = CRDLoss([ s_dim, t_dim, n_data, feat_dim, nce_k, nce_t, nce_m])     
 
+    def mimic_crd(x, y, idx, sample_idx):
+        return x, y, idx, sample_idx
+    
     def forward(self, network: nn.Module, batch):
         preact = False
         num_classes = 100               
@@ -321,7 +330,21 @@ class Augmix_CRD_Loss(nn.Module):
         
         replace = True if self.k > len(self.cls_negative[target]) else False
         neg_idx = np.random.choice(self.cls_negative[target], self.k, replace=replace)
-        constrast_idx = np.hstack((np.asarray([pos_idx]), neg_idx))
+        sample_idx = np.hstack((np.asarray([pos_idx]), neg_idx))
+        
+        crd_train = Augmix_CRD_Loss.mimic_crd(x, y, idx, sample_idx)
+        
+        
+        #crd_loader = DataLoader(crd_train, batch_size = 1, shuffle=True, num_workers=6)
+        
+        
+        #for indexes, crd_data in enumerate(crd_loader):
+         #   _, _, _, contrast_idx = crd_data
+        
+        
+        print(sample_idx)
+        contrast_idx = torch.from_numpy(sample_idx)
+        contrast_idx.to(x.device())
         
         criterion_dv = DistillKL(self.kd_T)
 
@@ -346,9 +369,9 @@ class Augmix_CRD_Loss(nn.Module):
         t_dim = feat_t[-1].shape[1]
         n_data = len(comb_x.cpu().detach().numpy())        
 
-        
+        #idx = torch.from_numpy(idx)
         #criterion_kd.to(device)
-        loss_crd = criterion_kd(f_s, f_t, idx, constrast_idx) * self.delta
+        loss_crd = self.criterion_kd(f_s, f_t, idx, constrast_idx) * self.delta
                 
         loss_kd = criterion_dv(logit_s, logit_t) * self.charlie
         

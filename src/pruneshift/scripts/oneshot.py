@@ -39,7 +39,7 @@ def oneshot(cfg):
                           train_loss=train_loss)
 
     trainer.fit(module, datamodule=data)
-    trainer.test(module, datamodule=data, verbose=False)
+    trainer.test(module, datamodule=data)
 
 
 if __name__ == "__main__":

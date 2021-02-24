@@ -1,6 +1,7 @@
 import torch
 from torch import nn
 import math
+import numpy as np
 
 
 class ContrastMemory(nn.Module):
@@ -12,7 +13,8 @@ class ContrastMemory(nn.Module):
         self.nLem = outputSize
         self.unigrams = torch.ones(self.nLem)
         self.multinomial = AliasMethod(self.unigrams)
-        self.multinomial.cuda()
+        #self.multinomial.cuda()
+        self.multinomial
         self.K = K
 
         self.register_buffer('params', torch.tensor([K, T, -1, -1, momentum]))
@@ -36,6 +38,8 @@ class ContrastMemory(nn.Module):
             idx = self.multinomial.draw(batchSize * (self.K + 1)).view(batchSize, -1)
             idx.select(1, 0).copy_(y.data)
         # sample
+        #idx = torch.from_numpy(idx)
+        print('idx: ', idx.__class__)
         weight_v1 = torch.index_select(self.memory_v1, 0, idx.view(-1)).detach()
         weight_v1 = weight_v1.view(batchSize, K + 1, inputSize)
         out_v2 = torch.bmm(weight_v1, v2.view(batchSize, inputSize, 1))
@@ -121,8 +125,10 @@ class AliasMethod(object):
             self.prob[last_one] = 1
 
     def cuda(self):
-        self.prob = self.prob.cuda()
-        self.alias = self.alias.cuda()
+        #self.prob = self.prob.cuda()
+        #self.alias = self.alias.cuda()
+        self.prob = self.prob
+        self.alias = self.alias
 
     def draw(self, N):
         """ Draw N samples from multinomial """
