@@ -276,8 +276,12 @@ class ResNet(nn.Module):
     
     def _forward_impl(self, x: Tensor) -> Tensor:
         # See note [TorchScript super()]
-        is_feat = True
+        if self.training:
+            is_feat = True
+        else:            
+            is_feat = False
         preact = False
+        #print(x)
         x = self.conv1(x)
         x = self.bn1(x)
         x = self.relu(x)

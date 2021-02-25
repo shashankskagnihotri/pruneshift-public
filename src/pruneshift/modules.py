@@ -96,6 +96,7 @@ class VisionModule(pl.LightningModule):
 
     def test_step(self, batch, batch_idx, dataset_idx=0):
         idx, x, y = batch
+        #print(x)
         self.test_acc[self.test_labels[dataset_idx]](
             y, torch.argmax(self(x), -1)
         )

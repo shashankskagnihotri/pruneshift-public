@@ -17,7 +17,10 @@ from torch.utils.data import DataLoader
 class StandardLoss(nn.Module):
     def forward(self, network: nn.Module, batch):
         idx, x, y = batch
-        _, logits = network(x)
+        if network.training:
+            _, logits = network(x)
+        else:
+            logits = network(x)
         #import ipdb;ipdb.set_trace()
         #print(y.__class__)
         #print(logits.__class__)
