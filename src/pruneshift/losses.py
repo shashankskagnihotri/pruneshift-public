@@ -90,7 +90,10 @@ class AugmixKnowledgeDistill(nn.Module):
 
         _, kd_logits = network(comb_x)
         with torch.no_grad():
-            _, teacher_logits = self.teacher(idx, comb_x)
+            if self.teacher.training:
+                _, teacher_logits = self.teacher(idx, comb_x)
+            else:
+                teacher_logits = self.teacher(idx, comb_x)
 
         loss_kd = criterion_dv(kd_logits, teacher_logits) * self.charlie
         logits = torch.split(kd_logits, kd_logits.shape[0] // 3)
@@ -335,46 +338,33 @@ class Augmix_CRD_Loss(nn.Module):
         neg_idx = np.random.choice(self.cls_negative[target], self.k, replace=replace)
         sample_idx = np.hstack((np.asarray([pos_idx]), neg_idx))
         
-        crd_train = Augmix_CRD_Loss.mimic_crd(x, y, idx, sample_idx)
-        
-        
-        #crd_loader = DataLoader(crd_train, batch_size = 1, shuffle=True, num_workers=6)
-        
-        
-        #for indexes, crd_data in enumerate(crd_loader):
-         #   _, _, _, contrast_idx = crd_data
-        
-        
-        print(sample_idx)
-        contrast_idx = torch.from_numpy(sample_idx)
-        contrast_idx.to(x.device())
+
+        comb_x = torch.cat(x)
+        contrast_idx = sample_idx[0]
+        #contrast_idx.to(comb_x.device())
         
         criterion_dv = DistillKL(self.kd_T)
 
-        comb_x = torch.cat(x)
-        network.eval()
-        feat_s, _ = network(comb_x)
+        
         network.train()
+        feat_s, _ = network(comb_x)
         _, logit_s = network(comb_x)
-        #feat_s = [f.detach() for f in feat_s]
-        #self.teacher_network.eval()
-        self.teacher.eval()
         with torch.no_grad():
             #feat_t, logit_t = self.teacher_network(idx, comb_x, is_feat=True, preact=preact)
-            feat_t, logit_t = self.teacher(idx, comb_x)
+            self.teacher.train()
+            feat_t, _ = self.teacher(idx, comb_x)
+            self.teacher.eval()
+            logits_t = self.teacher(idx, comb_x)
             device = feat_t[0].device
             feat_t = [f.detach() for f in feat_t]
         f_s = feat_s[-1]
         f_t = feat_t[-1]
-        #print(f_s)
-        #print(f_t.cuda(device=f_s.cuda(device)))
+
         s_dim = feat_s[-1].shape[1]
         t_dim = feat_t[-1].shape[1]
         n_data = len(comb_x.cpu().detach().numpy())        
 
-        #idx = torch.from_numpy(idx)
-        #criterion_kd.to(device)
-        loss_crd = self.criterion_kd(f_s, f_t, idx, constrast_idx) * self.delta
+        loss_crd = self.criterion_kd(f_s, f_t, idx, contrast_idx) * self.delta
                 
         loss_kd = criterion_dv(logit_s, logit_t) * self.charlie
         

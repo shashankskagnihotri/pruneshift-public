@@ -42,8 +42,6 @@ class CRDLoss(nn.Module):
         #print(f_s)
         f_s = self.embed_s(f_s)
         f_t = self.embed_t(f_t)
-        print('idx before momery: ', idx.__class__)
-        print('contract_idx: ', contrast_idx.__class__)
         out_s, out_t = self.contrast(f_s, f_t, idx, contrast_idx)
         s_loss = self.criterion_s(out_s)
         t_loss = self.criterion_t(out_t)
