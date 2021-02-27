@@ -80,12 +80,12 @@ def create_trainer(cfg: DictConfig):
     return trainer
 
 
-def create_loss(cfg: DictConfig, network):
+def create_loss(cfg: DictConfig, network, datamodule):
     if "teacher" in cfg:
         teacher = create_teacher(**cfg.teacher)
-        return instantiate(cfg.loss, network=network, teacher=teacher)
+        return instantiate(cfg.loss, network=network, teacher=teacher, datamodule=datamodule)
 
-    return instantiate(cfg.loss, network=network)
+    return instantiate(cfg.loss, network=network, datamodule=datamodule)
 
 @rank_zero_only
 def print_test_results(results):

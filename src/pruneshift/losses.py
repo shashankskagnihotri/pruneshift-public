@@ -16,7 +16,7 @@ from torch.utils.data import DataLoader
 
     
 class StandardLoss(nn.Module):
-    def __init__(self, network: nn.Module):
+    def __init__(self, network: nn.Module, **kwargs):
         super(StandardLoss, self).__init__()
         self.network = network
 
@@ -36,6 +36,7 @@ class KnowledgeDistill(nn.Module):
         kd_T: float = 4.0,
         gamma: float = 0.1,
         charlie: float = 0.9,
+        **kwargs,
     ):
         super(KnowledgeDistill, self).__init__()
         self.network = network
@@ -74,6 +75,7 @@ class AttentionDistill(nn.Module):
         kd_T: float = 4.0,
         p: float = 1.0,
         beta: float = 1.0,
+        **kwargs,
     ):
         super(AttentionDistill, self).__init__()
         self.network = network
@@ -168,6 +170,7 @@ class AugmixKnowledgeDistill(nn.Module):
         charlie: float = 0.5,
         alpha: float = 12.0,
         beta: float = 0.5,
+        **kwargs,
     ):
         """Implements the AugmixLoss from the augmix paper.
 
@@ -234,6 +237,7 @@ class AugmixLoss(nn.Module):
         alpha: float = 12.0,
         beta: float = 1.0,
         soft_target: bool = False,
+        **kwargs,
     ):
         """Implements the AugmixLoss from the augmix paper.
 
@@ -280,14 +284,18 @@ class AugmixLoss(nn.Module):
 
 
 class CRD_Loss(nn.Module):
-    def __init__(self, teacher:Teacher, teacher_path,
+    def __init__(self, network: nn.Module, datamodule, teacher:Teacher, teacher_path,
         teacher_model_id, kd_T: float = 4.,
         gamma:float = 0.1, charlie:float = 0.1,
         delta: float = 0.8, feat_dim: int=128,
         nce_k:int= 16384, nce_t:int=0.07, nce_m:int= 0.5,
-        percent:float=1.0, mode:str='exact'):
+        percent:float=1.0, mode:str='exact', **kwargs):
 
         super(CRD_Loss, self).__init__()
+        self.network = network
+        self.datamodule = datamodule
+        # You can access the dataset by using:
+        # self.datamodule.train_dataset[0] -> idx, x, y    or for augmix idx, (x, x1, x2), y
         self.teacher = teacher
         #self.teacher_network = create_network(teacher_model_id, ckpt_path=teacher_path)
         self.kd_T = kd_T 	 	#temperature for KD
@@ -298,7 +306,7 @@ class CRD_Loss(nn.Module):
         self.nce_k = nce_k		#number of negatives paired with each positive
         self.nce_t = nce_t		#the temperature
         self.nce_m = nce_m		#the momentum for updating the memory buffer
-        self.feat_dim=feat_dim
+        self.feat_dim = feat_dim
         self.percent = percent
         self.mode = mode
 
@@ -345,7 +353,7 @@ class CRD_Loss(nn.Module):
 
         criterion_dv = DistillKL(self.kd_T)
 
-        feat_s, logit_s = network(x, is_feat=True, preact=preact)
+        feat_s, logit_s = self.network(x, is_feat=True, preact=preact)
         #self.teacher_network.eval()
         self.teacher.eval()
         with torch.no_grad():
@@ -367,13 +375,13 @@ class CRD_Loss(nn.Module):
         return loss+loss_kd+loss_crd , stats
 
 class Augmix_CRD_Loss(nn.Module):
-    def __init__(self, network: nn.Module, teacher:Teacher, teacher_path, teacher_model_id,
+    def __init__(self, network: nn.Module, datamodule, teacher:Teacher, teacher_path, teacher_model_id,
         kd_T: float = 4., alpha:float=12., gamma:float = 0.1,
         charlie:float = 0.1, delta: float = 0.8,
         feat_dim: int=128, nce_k:int= 16384,
         nce_t:int=0.07, nce_m:int= 0.5,
         percent:float=1.0, mode:str='exact', k=4096,
-        s_dim=None, t_dim=None, n_data=None):
+        s_dim=None, t_dim=None, n_data=None, **kwargs):
 
         super(Augmix_CRD_Loss, self).__init__()
         #self.teacher_network = create_network(teacher_model_id, ckpt_path=teacher_path)

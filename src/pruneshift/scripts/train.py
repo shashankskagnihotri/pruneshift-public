@@ -23,7 +23,7 @@ def train(cfg):
     data = ShiftDataModule(**cfg.datamodule)
     optimizer_fn = partial_instantiate(cfg.optimizer)
     scheduler_fn = partial_instantiate(cfg.scheduler)
-    train_loss = create_loss(cfg, network)
+    train_loss = create_loss(cfg, network, datamodule)
 
     module = VisionModule(network=network,
                           test_labels=data.labels,
