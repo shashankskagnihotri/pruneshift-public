@@ -17,6 +17,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torchvision.models as imagenet_models
+import timm
 import pytorch_lightning as pl
 
 from .utils import safe_ckpt_load
@@ -28,9 +29,9 @@ import models as models
 logger = logging.getLogger(__name__)
 
 
-NETWORK_REGEX = re.compile(
-    r"(?P<group>[a-zA-Z]+)(?P<num_classes>[0-9]+)_(?P<name>[a-zA-Z0-9_]+)"
-)
+# NETWORK_REGEX = re.compile(
+#     r"(?P<group>[a-zA-Z]+)(?P<num_classes>[0-9]+)_(?P<name>[a-zA-Z0-9_]+)"
+# )
 
 
 def protect_classifier(name: str, network: nn.Module):
@@ -55,7 +56,7 @@ def create_network(
     ckpt_path: str = None,
     model_path: str = None,
     version: int = None,
-    protect_classifier_fn: Optional[Callable] = protect_classifier,
+    protect_classifier_fn: Optional[Callable] = None,
     download: bool = False,
     imagenet_subset: Optional[bool] = None,
     **kwargs,
@@ -95,7 +96,11 @@ def create_network(
         else:
             network_fn = getattr(models, name)
     elif group == "imagenet":
-        network_fn = getattr(imagenet_models, name)
+        if hasattr(imagenet_models, name):
+            network_fn = getattr(imagenet_models, name)
+        else:
+            # Look at pytorch-image-models
+            network_fn = partial(timm.create_model, model_name=name)
     else:
         raise ValueError(f"Unknown group {group}.")
 
@@ -170,8 +175,8 @@ class ImagenetSubsetWrapper(nn.Module):
         perm.extend(set(range(len(super_class_dirs))) - set(perm))
         return torch.tensor(perm)
 
-    def forward(self, x):
-        return self.network(x)[..., self.perm[: self.num_classes]]
+    def forward(self, *args):
+        return self.network(*args)[..., self.perm[: self.num_classes]]
 
 
 def add_reset_hook(network: nn.Module, network_factory: Callable, version=0):

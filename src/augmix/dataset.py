@@ -52,7 +52,7 @@ class AugMixWrapper(torch.utils.data.Dataset):
 
     def __init__(self, dataset: torch.utils.data.Dataset, transform,
             no_jsd: bool = False, all_ops: bool = False,
-            mixture_width: int = 3, mixture_depth: int = -1, aug_severity: int = 1):
+            mixture_width: int = 3, mixture_depth: int = -1, aug_severity: int = 3):
         """ Dataset wrapper to perform AugMix augmentation.
 
         Args:

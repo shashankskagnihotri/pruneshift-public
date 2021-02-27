@@ -3,6 +3,7 @@ from functools import partial
 import logging
 from typing import Sequence
 from typing import Callable
+import re
 
 
 import pytorch_lightning as pl
@@ -55,7 +56,7 @@ class VisionModule(pl.LightningModule):
         super(VisionModule, self).__init__()
         self.network = network
         self.train_loss = StandardLoss() if train_loss is None else train_loss
-        self.val_loss = StandardLoss()
+        self.val_loss = StandardLoss(network)
         self.optimizer_fn = optimizer_fn
         self.scheduler_fn = scheduler_fn
 
@@ -69,7 +70,7 @@ class VisionModule(pl.LightningModule):
         return self.network(x)
 
     def training_step(self, batch, batch_idx):        
-        loss, stats = self.train_loss(self, batch)
+        loss, stats = self.train_loss(batch)
         self.log("train_loss", loss, on_step=False, on_epoch=True, sync_dist=True)
 
         for n, v in stats.items():
@@ -79,7 +80,7 @@ class VisionModule(pl.LightningModule):
         return loss
 
     def validation_step(self, batch, batch_idx):
-        loss, stats = self.val_loss(self, batch)
+        loss, stats = self.val_loss(batch)
         acc = stats["acc"]
 
         self.log(
@@ -112,8 +113,9 @@ class VisionModule(pl.LightningModule):
         if len(values) <= 1:
             return
 
-        # Caluclate the mean corruption error.
-        non_clean = [acc for l, acc in values.items() if l != "test_acc_clean"]
+        # Caluclate the mean corruption error, we need to filter out all non corruption accuracies.
+        corr_regex = re.compile(r"test_acc_[a-z_]+_[0-9]")
+        non_clean = [acc for l, acc in values.items() if corr_regex.match(l)]
         self.log("test_mCE", 1 - torch.tensor(non_clean).mean())
 
     def configure_optimizers(self):

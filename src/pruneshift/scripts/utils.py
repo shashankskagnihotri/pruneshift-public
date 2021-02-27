@@ -2,6 +2,7 @@ from functools import partial
 from pathlib import Path
 import logging
 import warnings
+from typing import Dict
 
 from hydra.utils import instantiate
 from omegaconf import DictConfig, OmegaConf
@@ -9,6 +10,7 @@ import pytorch_lightning as pl
 from pytorch_lightning.loggers import TensorBoardLogger
 from pytorch_lightning.loggers import CSVLogger
 from pytorch_lightning.callbacks import LearningRateMonitor
+from pytorch_lightning.utilities import rank_zero_only
 
 from pruneshift.teachers import create_teacher
 
@@ -78,10 +80,17 @@ def create_trainer(cfg: DictConfig):
     return trainer
 
 
-def create_loss(cfg: DictConfig):
+def create_loss(cfg: DictConfig, network):
     if "teacher" in cfg:
         teacher = create_teacher(**cfg.teacher)
-        return instantiate(cfg.loss, teacher=teacher)
+        return instantiate(cfg.loss, network=network, teacher=teacher)
 
-    return instantiate(cfg.loss)
+    return instantiate(cfg.loss, network=network)
+
+@rank_zero_only
+def print_test_results(results):
+    logger.info("Test Results:")
+    results = results[0]
+    for name, value in results.items():
+        print(f"\t{name}:\t\t{value}")
 

@@ -1,0 +1,9 @@
+# @package _group_
+
+name: resnet18
+model_path: ${path.model}
+ckpt_path: null
+num_classes: ${network.num_classes}
+group: ${network.group}
+version: 0
+

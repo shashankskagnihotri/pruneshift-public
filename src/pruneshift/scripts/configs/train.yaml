@@ -4,7 +4,7 @@ defaults:
     - loss: standard
     - network: standard
     - trainer: standard
-    - scheduler: cosine
+    - teacher:
     - optimizer: sgd
     - datamodule: cifar100
 

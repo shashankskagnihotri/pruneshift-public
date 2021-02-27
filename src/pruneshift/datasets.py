@@ -14,7 +14,6 @@ import torch.utils.data as data
 from augmix.dataset import AugMixWrapper
 
 
-
 class SplitImageFolder(ImageFolder):
     """Efficiently calculates split sets from image folders.
 
@@ -70,6 +69,37 @@ class SplitImageFolder(ImageFolder):
         return np.array(num_examples)
 
 
+class ImageFolderSubset(ImageFolder):
+    """Selects a subset of an ImageFolder relative to the classes of a different subset.
+    This is done by overwriting the _find_classes method of the ImageFolder class.
+
+    Args:
+        root: The root to the ImageFolder, where want the subset from.
+        subset_root: The root which contains the classes for the subset.
+        transform: The transformation that should be applied to the samples.
+        target_transform: The transformation that should be applied to the targets.
+
+    Attributes:
+        classes_subset: The classes that are used.
+    """
+
+    def __init__(self, root, subset: ImageFolder, transform=None, target_transform=None):
+        self.classes_subset = set(subset.classes)
+
+        super(ImageFolderSubset, self).__init__(
+            root=root, transform=transform, target_transform=target_transform
+        )
+
+    def _find_classes(self, root: str):
+        """ Overwrites find classes method to remove all the labels not needed."""
+        classes = set(p.stem for p in Path(self.root).iterdir())
+        # Filter out all classes that are not in the subset.
+        classes = set.intersection(self.classes_subset, classes)
+        classes = sorted(classes)
+        class_to_idx = {cls_name: i for i, cls_name in enumerate(classes)}
+        return classes, class_to_idx
+
+
 class TransformWrapper(Dataset):
     def __init__(self, dataset, transform, with_idx=False):
         self.dataset = dataset
@@ -81,7 +111,7 @@ class TransformWrapper(Dataset):
 
         if self.transform is not None:
             x = self.transform(x)
- 
+
         if self.with_idx:
             return idx, x, y
         return x, y
@@ -203,4 +233,3 @@ class ImageNetC:
     def lvl_subsets(self):
         path = self.root / self.distortion
         return [ImageFolder(path / str(i), self.transform) for i in range(1, 6)]
-

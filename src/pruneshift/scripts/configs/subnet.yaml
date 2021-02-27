@@ -4,7 +4,7 @@ defaults:
     - loss: standard
     - network: pretrained
     - trainer: standard
-    - scheduler: cosine
+    - teacher:
     - optimizer: sgd
     - datamodule: cifar100
 
@@ -17,4 +17,3 @@ trainer:
     weights_summary: null
 
 seed: 0
-

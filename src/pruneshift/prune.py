@@ -29,6 +29,12 @@ class L1GradUnstructered(prune_torch.L1Unstructured):
         return super(L1GradUnstructered, self).compute_mask(t.grad, default_mask)
 
 
+class ZeroWeights(prune_torch.CustomFromMask):
+    """ Prunes all the zero weights, for checkpoints from other frameworks."""
+    def compute_mask(self, t, default_mask):
+        return super(ZeroWeights, self).__init__(t == 0, default_mask)
+
+
 def prune(
     network: nn.Module, method: str, ratio: float, reset_weights: bool = False
 ) -> PruneInfo:
@@ -64,15 +70,15 @@ def prune(
         pruning_cls = L1GradUnstructered
         layerwise = True
         raise NotImplementedError
-    elif method == "l1_channels_lottery":
-        pruning_cls = partial(prune_torch.ln_structured, n=1, dim=0)
-
     elif method == "l1_channels":
         pruning_cls = partial(prune_torch.ln_structured, n=1, dim=0)
         layerwise = True
     elif method == "random":
         pruning_cls = prune_torch.RandomUnstructured
         layerwise = False
+    elif method == "zero_weights":
+        pruning_cls = ZeroWeights 
+        layerwise = True
     else:
         raise ValueError(f"Unknown pruning method: {method}")
 

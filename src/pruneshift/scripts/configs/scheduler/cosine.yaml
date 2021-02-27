@@ -1,9 +1,0 @@
-# @package _global_
-
-trainer:
-    max_epochs: 200
-
-scheduler:
-    _target_: torch.optim.lr_scheduler.CosineAnnealingLR
-    T_max: ${trainer.max_epochs}
-

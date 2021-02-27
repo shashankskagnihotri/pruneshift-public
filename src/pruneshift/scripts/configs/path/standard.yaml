@@ -8,6 +8,7 @@ path:
     imagenet100: /misc/scratchSSD2/datasets/ILSVRC2012-100
     imagenet200: /misc/scratchSSD2/datasets/ILSVRC2012-200
     imagenet1000: /misc/scratchSSD2/datasets/ILSVRC2012
+    deepaugment: /misc/scratchSSD2/datasets/DeepAugment
 
 hydra:
     run:

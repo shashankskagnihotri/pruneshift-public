@@ -1,6 +1,7 @@
 from pathlib import Path
 from typing import Union
 from typing import Tuple
+import logging
 
 import numpy as np
 from ptflops import get_model_complexity_info
@@ -12,8 +13,6 @@ from pruneshift.prune_hydra import hydrate
 from pruneshift.prune_hydra import dehydrate
 from pruneshift.prune_hydra import is_hydrated
 
-
-torch.autograd.set_detect_anomaly(True)
 
 
 def safe_ckpt_load(network: nn.Module, path: Union[str, Path]):
@@ -29,7 +28,7 @@ def safe_ckpt_load(network: nn.Module, path: Union[str, Path]):
 
     if hydrated:
         load_hydrated_state_dict(network, state_dict)
-    elif torch_prune.is_pruned(network):
+    elif pruned:
         load_pruned_state_dict(network, state_dict)
     else:
         network.load_state_dict(state_dict)
@@ -67,7 +66,7 @@ def load_pruned_state_dict(network: nn.Module, state_dict):
     for param_name, param in list(network.named_parameters()):
         if param_name + "_orig" in state_dict:
             # If the checkpoint was from hydra delete the scores.
-            del state_dict[param_name]
+            # del state_dict[param_name]
 
             idx = param_name.rfind(".")
             module_name, param_name = param_name[:idx], param_name[idx + 1 :]

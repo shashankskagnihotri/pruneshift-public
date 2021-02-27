@@ -1,12 +1,13 @@
 # @package _global_
 
 datamodule:
-    name: cifar10_corrupted
+    name: cifar10
     root: ${path.dataset}
     num_workers: 10
     batch_size: 128
+    augmix: False
+    test_corrupted: True
 
 network:
     num_classes: 10
     group: cifar
-

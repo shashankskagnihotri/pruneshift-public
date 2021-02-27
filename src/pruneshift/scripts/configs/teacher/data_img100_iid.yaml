@@ -1,0 +1,5 @@
+# @package _group_
+
+activations_path: /misc/lmbraid19/hoffmaja/models/dataset_teachers/img100_iid.dat
+num_classes: 100
+imagenet_subset: False

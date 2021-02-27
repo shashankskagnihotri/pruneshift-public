@@ -1,13 +1,21 @@
 # @package _global_
 
 datamodule:
-    name: cifar100_augmix_corrupted
+    name: cifar100
     root: ${path.dataset}
     num_workers: 10
     batch_size: 128
-    no_jsd: False
+    augmix: True
+    test_corrupted: True
 
 network:
     num_classes: 100
     group: cifar
+
+trainer:
+    max_epochs: 100
+
+scheduler:
+    _target_: torch.optim.lr_scheduler.CosineAnnealingLR
+    T_max: ${trainer.max_epochs}
 

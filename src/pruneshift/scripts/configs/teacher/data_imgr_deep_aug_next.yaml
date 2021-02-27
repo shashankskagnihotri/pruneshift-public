@@ -1,0 +1,5 @@
+# @package _group_
+
+activations_path: /misc/lmbraid19/hoffmaja/models/dataset_teachers/imgr_deep_aug_next.dat
+imagenet_subset: True
+num_classes: ${network.num_classes}

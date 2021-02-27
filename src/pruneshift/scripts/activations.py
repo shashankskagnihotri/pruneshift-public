@@ -7,7 +7,9 @@ from hydra.utils import instantiate
 from hydra.utils import call
 import numpy as np
 import torch.nn as nn
+import torch
 import pytorch_lightning as pl
+from pytorch_lightning.metrics import Accuracy
 
 from pruneshift.scripts.utils import create_trainer
 from pruneshift.scripts.utils import save_config
@@ -28,13 +30,12 @@ class ActivationCollector(pl.LightningModule):
         self.path = path
         self.activations = None
         self.dataloader = dataloader
+        self.num_samples = len(self.dataloader.dataset)
+        self.test_acc = Accuracy()
 
-    @property
-    def num_samples(self):
-        return len(self.dataloader.dataset)
-
-    def test_step(self, batch, batch_idx):
-        activations = self.network(batch).cpu().numpy()
+    def test_step(self, batch, batch_idx, dataset_idx=0):
+        idx, x, y = batch
+        activations = self.network(x)
 
         if self.activations is None:
             assert activations.ndim == 2
@@ -45,8 +46,13 @@ class ActivationCollector(pl.LightningModule):
                 self.path, dtype=np.float32, mode="w+", shape=shape
             )
 
-        self.activations[batch.idx.cpu().numpy()] = activations
+        self.activations[idx.cpu().numpy()] = activations.detach().cpu().numpy()
+        # self.activations[idx.cpu().numpy()] = torch.normal(0, 1, size=activations.shape)
         self.activations.flush()
+        self.test_acc(y, torch.argmax(activations, -1))
+
+    def test_epoch_end(self, outputs):
+        self.log("dataset_acc", self.test_acc.compute())
 
 
 @hydra.main(config_path="configs", config_name="collect.yaml")
@@ -57,8 +63,13 @@ def collect(cfg):
     trainer = create_trainer(cfg)
     network = call(cfg.network)
     data = datamodule(**cfg.datamodule)
-    data.setup("fit")
-    loader = data.train_dataloader()
+
+    if cfg.train:
+        data.setup("fit")
+        loader = data.train_dataloader()
+    else:
+        data.setup("test")
+        loader = data.test_dataloader()[0]
 
 
     module = ActivationCollector(network, cfg.save_path, loader)

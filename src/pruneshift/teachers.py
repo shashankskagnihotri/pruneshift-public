@@ -4,8 +4,8 @@ import logging
 import torch
 import torch.nn as nn
 import numpy as np
-from pruneshift.networks import NETWORK_REGEX
 from pruneshift.networks import create_network
+from pruneshift.networks import ImagenetSubsetWrapper
 
 
 logger = logging.getLogger(__name__)
@@ -26,6 +26,10 @@ def create_teacher(
     logger.info("Creating teacher network...")
 
     if activations_path is not None:
+        if imagenet_subset:
+            logger.info(f"Adopting teacher database to {num_classes} classes.")
+            network = DatabaseNetwork(activations_path, 1000)
+            return ImagenetSubsetWrapper(network, num_classes)
         return DatabaseNetwork(activations_path, num_classes)
 
     network = create_network(
@@ -58,6 +62,6 @@ class DatabaseNetwork(Teacher):
         self.activations = np.reshape(self.activations, (-1, num_classes))
 
     def forward(self, idx, x):
-        activations = torch.tensor(self.activations[idx.cpu().numpy()])
+        activations = torch.tensor(np.array(self.activations[idx.cpu().numpy()]))
         return activations.to(idx.device)
 

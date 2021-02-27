@@ -3,6 +3,7 @@
 name: ${network.name} 
 model_path: ${network.model_path}
 ckpt_path: ${network.ckpt_path} 
+activations_path: null
 version: ${network.version}
 num_classes: ${network.num_classes}
 group: ${network.group}

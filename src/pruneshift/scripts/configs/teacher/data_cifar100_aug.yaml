@@ -1,0 +1,5 @@
+# @package _group_
+
+activations_path: /misc/lmbraid19/hoffmaja/models/dataset_teachers/cifar100_aug_resnet18.dat
+imagenet_subset: False
+num_classes: ${network.num_classes}

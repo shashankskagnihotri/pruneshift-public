@@ -4,9 +4,13 @@ defaults:
     - datamodule: cifar100
     - trainer: standard
 
-datamodule:
-    with_idx: True
+network:
+    imagenet_subset: False
 
-save_path:
+datamodule:
+    only_test_transforms: True
+
+save_path: ???
 
 seed: 0
+train: True
