@@ -13,6 +13,7 @@ from pytorch_lightning.callbacks import LearningRateMonitor
 from pytorch_lightning.utilities import rank_zero_only
 
 from pruneshift.teachers import create_teacher
+from pruneshift.modules import CORRUPTION_REGEX
 
 logger = logging.getLogger(__name__)
 
@@ -92,5 +93,7 @@ def print_test_results(results):
     logger.info("Test Results:")
     results = results[0]
     for name, value in results.items():
-        print(f"\t{name}:\t\t{value}")
+        if CORRUPTION_REGEX.match(name):
+            continue
+        print(f"\t{name}: {value:.3f}")
 

@@ -21,6 +21,7 @@ from pruneshift.losses import StandardLoss
 
 
 logger = logging.getLogger(__name__)
+CORRUPTION_REGEX = re.compile(r"test_acc_[a-z_]+_[0-9]")
 
 
 class MultiStepWarmUpLr(LambdaLR):
@@ -114,8 +115,7 @@ class VisionModule(pl.LightningModule):
             return
 
         # Caluclate the mean corruption error, we need to filter out all non corruption accuracies.
-        corr_regex = re.compile(r"test_acc_[a-z_]+_[0-9]")
-        non_clean = [acc for l, acc in values.items() if corr_regex.match(l)]
+        non_clean = [acc for l, acc in values.items() if CORRUPTION_REGEX.match(l)]
         self.log("test_mCE", 1 - torch.tensor(non_clean).mean())
 
     def configure_optimizers(self):

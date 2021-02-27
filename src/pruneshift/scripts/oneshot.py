@@ -31,7 +31,7 @@ def oneshot(cfg):
     prune_fn = partial(prune, **cfg.prune)
     optimizer_fn = partial_instantiate(cfg.optimizer)
     scheduler_fn = partial_instantiate(cfg.scheduler)
-    train_loss = create_loss(cfg, network, datamodule)
+    train_loss = create_loss(cfg, network, data)
 
     module = PrunedModule(network=network,
                           prune_fn=prune_fn,

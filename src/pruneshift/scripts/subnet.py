@@ -29,7 +29,7 @@ def subnet(cfg):
     data = datamodule(**cfg.datamodule)
     optimizer_fn = partial_instantiate(cfg.optimizer)
     scheduler_fn = partial_instantiate(cfg.scheduler)
-    train_loss = create_loss(cfg, network, datamodule)
+    train_loss = create_loss(cfg, network, data)
 
     logger.info("Bringing the network into the mask optimization state.")
     hydrate(network, **cfg.hydrate)
