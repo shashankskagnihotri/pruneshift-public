@@ -62,7 +62,6 @@ def load_hydrated_state_dict(network: nn.Module, state_dict):
     return network
 
 
-
 def load_pruned_state_dict(network: nn.Module, state_dict):
     """ Changes and loads the network accordingly to the checkpoint."""
     # 2. Find all params that need to be pruned.

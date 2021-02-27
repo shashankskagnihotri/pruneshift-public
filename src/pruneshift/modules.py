@@ -70,6 +70,10 @@ class VisionModule(pl.LightningModule):
     def forward(self, x):
         return self.network(x)
 
+    def state_dict(self):
+        """ Make sure only the trained network is used for saving."""
+        return self.network.state_dict()
+
     def training_step(self, batch, batch_idx):        
         loss, stats = self.train_loss(batch)
         self.log("train_loss", loss, on_step=False, on_epoch=True, sync_dist=True)

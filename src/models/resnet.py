@@ -280,6 +280,7 @@ class ResNet(nn.Module):
             is_feat = True
         else:            
             is_feat = False
+        is_feat = False
         preact = False
         #print(x)
         x = self.conv1(x)
