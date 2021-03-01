@@ -106,16 +106,14 @@ class AttentionDistill(nn.Module):
 
         return torch.norm(student_attention - teacher_attention, 2) / 2
 
-    def ensure_hook(self, module_name: str, network: nn.Module, teacher: bool):
+    def ensure_hook(self, module_name: str, module: nn.Module, is_teacher: bool):
         """ Ensures that there are hooks in a module."""
 
         def save_activation(module, inputs, outputs):
-            if teacher:
+            if is_teacher:
                 self.teacher_activations[module_name] = outputs
             else:
                 self.student_activations[module_name] = outputs
-
-        module = getattr(network, module_name)
 
         # Check wether the module was already registered.
         if hasattr(module, "__activation_hook"):
@@ -124,25 +122,40 @@ class AttentionDistill(nn.Module):
         module.register_forward_hook(save_activation)
         module.__activation_hook = None
 
-    def target_modules(self):
-        return ["layer1", "layer2", "layer3"]
+    def target_modules(self, is_teacher: bool):
+        # This is only for resnet architectures.
 
-    def prepare_activations(self, student: nn.Module, teacher: nn.Module):
-        for module_name in self.target_modules:
-            ensure_hook(module_name, student, False)
-            if isinstance(teacher, DatabaseNetwork):
-                raise NotImplementedError
-            else:
-                ensure_hook(module_name, teacher.network, True)
+        layer_names = ["layer1", "layer2", "layer3"]
+
+        if is_teacher:
+            teacher = self.teacher.network
+            for ln in layer_names:
+                yield ln, getattr(teacher, ln)[-1].bn2
+        else:
+            for ln in layer_names:
+                yield ln, getattr(self.network, ln)[-1].bn2
+
+    def prepare_activations(self):
+        if isinstance(self.teacher, DatabaseNetwork):
+            raise NotImplementedError
+
+        # Register hooks.
+        for is_teacher in [False, True]: 
+            for module_name, module in self.target_modules(is_teacher):
+                self.ensure_hook(module_name, module, is_teacher)
 
     def forward(self, batch):
         idx, x, y = batch
-        self.prepare_activations(self.student, self.teacher)
+        self.prepare_activations()
         stats = {}
+        
+        # Teacher forward pass.
+        self.teacher(idx, x)
 
         # Calculate normal loss
         logits = self.network(x)
         loss = F.cross_entropy(logits, y)
+        stats["cross_entropy_loss"] = loss
         stats["acc"] = accuracy(torch.argmax(logits, 1), y)
 
         # Calculate attention map losses.
@@ -152,13 +165,13 @@ class AttentionDistill(nn.Module):
                 self.student_activations[module_name],
                 self.teacher_activations[module_name],
             )
-            stats["at_loss_" + module_name] = at_loss
+            stats["loss_AT_" + module_name] = at_loss
             at_losses.append(at_loss)
 
         at_loss = sum(at_losses)
-        stats["loss"] = at_loss
+        stats["loss_AT"] = at_loss
 
-        return loss + self.beta * at_loss, stats
+        return (1 - self.mixture) * loss + self.mixture * at_loss, stats
 
 
 class AugmixKnowledgeDistill(nn.Module):
