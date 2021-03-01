@@ -48,6 +48,8 @@ def load_state_dict(path: Union[str, Path]):
         # Prune the network part due to the lightning module.
         if name[: idx] == "network":
             return name[idx + 1 :]
+        if name[: idx] == "module":
+            return name[idx + 1 :]
         return name 
 
     return {prune_name(n): p for n, p in state_dict.items()}

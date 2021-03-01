@@ -1,7 +1,4 @@
 """ Provides the data modules we need for our experiments."""
-# TODO: 1. Source the transformations out to a function.
-# TODO: 2. Do we need a different normalization, for the larger image size.
-# TODO: 3. Do 
 import logging
 from typing import Optional
 from typing import Union
@@ -36,7 +33,21 @@ class ShiftDataModule(pl.LightningDataModule):
     """A clean DataModule that provides standard training sets, augmentations
     and different test sets for distribution shifts.
 
-    TODO: Add documentation.
+    Args:
+        name: Name of the dataset/datamodule.
+        root: Where to save/find the data.
+        batch_size: The batch size used for the datamodule.
+        num_workers: Number of workers used for the dataloaders.
+        augmix: If true creates two additonal augmix samples,
+            when "no_jsd" it creates only one augmented sample.
+        deepaugment_path: Path to the deepaugment dataset that can
+            be downloaded from the following repository:
+            https://github.com/hendrycks/imagenet-r
+        test_train: Whether to add the train_dataset to the test set.
+        test_corrupted: Whether to test corruptions. 
+        test_renditions: Whether to test renditions.
+        with_normalize: Whether to normalize the samples, this is
+            helpful for visualizing.
     """
     def __init__(
         self,
@@ -164,8 +175,10 @@ class ShiftDataModule(pl.LightningDataModule):
             mean = (0.491, 0.4822, 0.4465)
             std = (0.247, 0.243, 0.262)
         elif self.name == "cifar100":
-            mean = (0.5071, 0.4867, 0.4408)
-            std = (0.2657, 0.2565, 0.2761)
+            # mean = (0.5071, 0.4867, 0.4408)
+            # std = (0.2657, 0.2565, 0.2761)
+            mean = (0.5, 0.5, 0.5)
+            std = (0.5, 0.5, 0.5)
         else:  # self.name == "imagenet":
             mean = (0.485, 0.456, 0.406)
             std = (0.229, 0.224, 0.225)

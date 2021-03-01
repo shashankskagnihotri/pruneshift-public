@@ -74,7 +74,7 @@ class AttentionDistill(nn.Module):
         teacher: Teacher,
         kd_T: float = 4.0,
         p: float = 1.0,
-        beta: float = 1.0,
+        mixture: float = 1.0,
         **kwargs,
     ):
         super(AttentionDistill, self).__init__()
