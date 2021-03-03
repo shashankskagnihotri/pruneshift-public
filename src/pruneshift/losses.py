@@ -74,7 +74,7 @@ class AttentionDistill(nn.Module):
         teacher: Teacher,
         kd_T: float = 4.0,
         p: float = 1.0,
-        mixture: float = 1.0,
+        beta: float = 2.0,
         **kwargs,
     ):
         super(AttentionDistill, self).__init__()
@@ -82,7 +82,7 @@ class AttentionDistill(nn.Module):
         self.teacher_activations = {}
         self.student_activations = {}
         self.teacher = teacher
-        self.mixture = mixture
+        self.beta = beta 
         self.p = p
 
     def attention_map(self, features):
@@ -101,10 +101,11 @@ class AttentionDistill(nn.Module):
             target_shape = (student_height, student_height)
             teacher_features = F.adaptive_avg_pool2d(student_features, target_shape)
 
+        # Vectorized attention maps.
         student_attention = self.attention_map(student_features)
         teacher_attention = self.attention_map(teacher_features)
 
-        return torch.norm(student_attention - teacher_attention, 2) / 2
+        return torch.norm(student_attention - teacher_attention, 2, dim=1).mean() / 2
 
     def ensure_hook(self, module_name: str, module: nn.Module, is_teacher: bool):
         """ Ensures that there are hooks in a module."""
@@ -118,7 +119,6 @@ class AttentionDistill(nn.Module):
         # Check wether the module was already registered.
         if hasattr(module, "__activation_hook"):
             return
-
         module.register_forward_hook(save_activation)
         module.__activation_hook = None
 
@@ -150,7 +150,8 @@ class AttentionDistill(nn.Module):
         stats = {}
         
         # Teacher forward pass.
-        self.teacher(idx, x)
+        with torch.no_grad():
+            self.teacher(idx, x)
 
         # Calculate normal loss
         logits = self.network(x)
@@ -168,10 +169,14 @@ class AttentionDistill(nn.Module):
             stats["loss_AT_" + module_name] = at_loss
             at_losses.append(at_loss)
 
-        at_loss = sum(at_losses)
+        at_loss = self.beta * sum(at_losses)
         stats["loss_AT"] = at_loss
 
-        return (1 - self.mixture) * loss + self.mixture * at_loss, stats
+        # Reset everything.
+        self.student_activations = {}
+        self.teacher_activations = {}
+
+        return loss + at_loss, stats
 
 
 class AugmixKnowledgeDistill(nn.Module):

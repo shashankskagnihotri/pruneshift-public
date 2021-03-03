@@ -96,4 +96,4 @@ def print_test_results(results):
         if CORRUPTION_REGEX.match(name):
             continue
         print(f"\t{name}: {value:.3f}")
-
+    print("\n")

@@ -3,4 +3,4 @@
 _target_: pruneshift.losses.AttentionDistill
 kd_T: 4.
 p: 1.0
-mixture: 0.5
+beta: 2.

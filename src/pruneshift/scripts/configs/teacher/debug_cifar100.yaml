@@ -1,0 +1,6 @@
+# @package _group_
+
+name: resnet18
+ckpt_path: "/misc/lmbraid19/agnihotr/thesis_pruneshift/2021-02-27/21-02-58/checkpoint/epoch_98-step_38708.ckpt"
+group: cifar
+num_classes: ${network.num_classes}
