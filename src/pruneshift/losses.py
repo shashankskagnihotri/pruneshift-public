@@ -47,7 +47,7 @@ class KnowledgeDistill(nn.Module):
 
     def forward(self, batch):
         idx, x, y = batch
-        logits = network(x)
+        logits = self.network(x)
         # print("\n\n\n\n")
         # print(logits)
         criterion_dv = DistillKL(self.kd_T)
