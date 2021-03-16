@@ -2,6 +2,7 @@
 
 _target_: pruneshift.losses.Augmix_CRD_Loss
 alpha: 12.
+beta: 0.1
 kd_T: 4.
 charlie: 0.1
 delta: 0.8
@@ -19,4 +20,6 @@ k: 4096
 
 s_dim: 512
 t_dim: 512
-n_data: 192
+n_data: 50000
+
+

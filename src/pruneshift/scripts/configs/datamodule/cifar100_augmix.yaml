@@ -6,6 +6,7 @@ datamodule:
     num_workers: 10
     batch_size: 128
     augmix: True
+    crd: False
     test_corrupted: True
 
 network:

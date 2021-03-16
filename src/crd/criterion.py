@@ -12,7 +12,7 @@ class CRDLoss(nn.Module):
     (b) using student as anchor, choose positive and negatives over the teacher side
 
     Args:
-        opt[0]: the dimension of student's feature
+        opt[0]: the dimension of student's feature : s_dim
         opt[1]: the dimension of teacher's feature
         opt[3]: the dimension of the projection space
         opt[4]: number of negatives paired with each positive
@@ -62,7 +62,7 @@ class ContrastLoss(nn.Module):
         m = x.size(1) - 1
 
         # noise distribution
-        Pn = 1 / float(self[2])
+        Pn = 1 / float(self.n_data)
 
         # loss for positive pair
         P_pos = x.select(1, 0)
