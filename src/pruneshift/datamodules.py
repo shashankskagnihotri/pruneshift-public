@@ -48,6 +48,8 @@ class ShiftDataModule(pl.LightningDataModule):
         test_renditions: Whether to test renditions.
         with_normalize: Whether to normalize the samples, this is
             helpful for visualizing.
+        only_test_transform: Whether to use only the test transformation
+            for the training pipeline.
     """
     def __init__(
         self,
@@ -61,6 +63,7 @@ class ShiftDataModule(pl.LightningDataModule):
         test_corrupted: bool = True,
         test_renditions: bool = False,
         with_normalize: bool = True,
+        only_test_transform: bool = False,
     ):
         super(ShiftDataModule, self).__init__()
         self.name = name
@@ -73,6 +76,7 @@ class ShiftDataModule(pl.LightningDataModule):
         self.test_corrupted = test_corrupted
         self.test_renditions = test_renditions
         self.with_normalize = with_normalize
+        self.only_test_transform = only_test_transform
 
         # Create the transformations corresponding to the dataset.
         self.train_transform = None
@@ -170,6 +174,9 @@ class ShiftDataModule(pl.LightningDataModule):
                 ]
             )
 
+        if self.only_test_transform:
+            self.train_transform = self.test_transform
+
         # 2. Create the correct normalizations.
         if self.name == "cifar10":
             mean = (0.491, 0.4822, 0.4465)
@@ -177,6 +184,7 @@ class ShiftDataModule(pl.LightningDataModule):
         elif self.name == "cifar100":
             # mean = (0.5071, 0.4867, 0.4408)
             # std = (0.2657, 0.2565, 0.2761)
+            # This is used by augmix.
             mean = (0.5, 0.5, 0.5)
             std = (0.5, 0.5, 0.5)
         else:  # self.name == "imagenet":

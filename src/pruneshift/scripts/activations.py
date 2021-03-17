@@ -15,7 +15,7 @@ from pruneshift.scripts.utils import create_trainer
 from pruneshift.scripts.utils import save_config
 from pruneshift.scripts.utils import create_optim
 from pruneshift.scripts.utils import partial_instantiate
-from pruneshift.datamodules import datamodule
+from pruneshift.datamodules import ShiftDataModule
 
 
 logger = logging.getLogger(__name__)
@@ -62,7 +62,7 @@ def collect(cfg):
     # Note that the trainer must be created first, for the seeding.
     trainer = create_trainer(cfg)
     network = call(cfg.network)
-    data = datamodule(**cfg.datamodule)
+    data = ShiftDataModule(**cfg.datamodule)
 
     if cfg.train:
         data.setup("fit")

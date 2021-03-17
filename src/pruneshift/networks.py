@@ -41,6 +41,7 @@ def protect_classifier(name: str, network: nn.Module):
             network.linear.is_protected = True
         else:
             network.fc.is_protected = True
+        network.conv1.is_protected = True
     elif name[:3] == "vgg":
         network.classifier[-1].is_protected = True
     elif name[:8] == "densenet":

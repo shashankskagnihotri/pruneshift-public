@@ -4,7 +4,7 @@ path:
     logdir: ${env:EXPERIMENT_PATH}/${now:%Y-%m-%d}/${now:%H-%M-%S}
     checkpoint: ${path.logdir}/checkpoints/
     dataset: ${env:DATASET_PATH}
-    model: ${env:MODEL_PATH}/standard/
+    model: ${env:MODEL_PATH}
     imagenet100: /misc/scratchSSD2/datasets/ILSVRC2012-100
     imagenet200: /misc/scratchSSD2/datasets/ILSVRC2012-200
     imagenet1000: /misc/scratchSSD2/datasets/ILSVRC2012
@@ -13,3 +13,4 @@ path:
 hydra:
     run:
         dir: ${path.logdir}
+

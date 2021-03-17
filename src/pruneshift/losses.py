@@ -1,6 +1,9 @@
 """ Implements losses and criterions."""
 import math
 from typing import Optional
+import re
+import logging
+
 import numpy as np
 import torch
 import torch.nn as nn
@@ -14,6 +17,8 @@ from pruneshift.teachers import DatabaseNetwork
 from torch.utils.data import DataLoader
 
 
+logger = logging.getLogger(__name__)
+
     
 class StandardLoss(nn.Module):
     def __init__(self, network: nn.Module, **kwargs):
@@ -21,7 +26,7 @@ class StandardLoss(nn.Module):
         self.network = network
 
     def forward(self, batch):
-        idx, x, y = batch
+        _, x, y = batch
         logits = self.network(x)
         loss = F.cross_entropy(logits, y)
         acc = accuracy(torch.argmax(logits, 1), y)
@@ -36,6 +41,7 @@ class KnowledgeDistill(nn.Module):
         kd_T: float = 4.0,
         gamma: float = 0.1,
         charlie: float = 0.9,
+        only_smooth: bool = False,
         **kwargs,
     ):
         super(KnowledgeDistill, self).__init__()
@@ -44,18 +50,41 @@ class KnowledgeDistill(nn.Module):
         self.kd_T = kd_T  # temperature for KD
         self.gamma = gamma  # scaling for the classification loss
         self.charlie = charlie  # scaling for the KD loss
+        self.only_smooth = only_smooth 
+
+    def kd_loss(self, student_logits, teacher_logits, y):
+        batch_size = teacher_logits.shape[0]
+        num_classes = teacher_logits.shape[1]
+
+        p_t = F.softmax(teacher_logits/self.kd_T, dim=1)
+
+        if self.only_smooth:
+            # Just use the smoothing effect.
+            # This implementation could probably be more efficient.
+            class_p = p_t[range(batch_size), y]
+            non_class_p = (1 - class_p) / (num_classes - 1)
+            p_t = torch.zeros_like(p_t) + non_class_p[:, None] 
+            p_t[range(batch_size), y] = class_p
+
+        p_s = F.log_softmax(student_logits/self.kd_T, dim=1)
+        loss = F.kl_div(p_s, p_t, size_average=False) * (self.kd_T**2) / batch_size
+
+        return loss
 
     def forward(self, batch):
         idx, x, y = batch
         logits = self.network(x)
         # print("\n\n\n\n")
         # print(logits)
-        criterion_dv = DistillKL(self.kd_T)
-        self.teacher.eval()
+
+        # TODO: This line could be problematic due to distribution shift.
+        # TODO: We should think about the batchnorm layers. 
+        # self.teacher.eval()
         with torch.no_grad():
             teacher_logits = self.teacher(idx, x)
+
         loss = F.cross_entropy(logits, y) * self.gamma
-        loss_kd = criterion_dv(logits, teacher_logits) * self.charlie
+        loss_kd = self.charlie * self.kd_loss(logits, teacher_logits, y)
         acc = accuracy(torch.argmax(logits, 1), y)
         teacher_acc = accuracy(torch.argmax(teacher_logits, 1), y)
         stats = {
@@ -65,6 +94,7 @@ class KnowledgeDistill(nn.Module):
             "KD_loss": loss_kd,
         }
         return loss + loss_kd, stats
+
 
 
 class AttentionDistill(nn.Module):
@@ -84,6 +114,11 @@ class AttentionDistill(nn.Module):
         self.teacher = teacher
         self.beta = beta 
         self.p = p
+
+        # teacher_entries = [name for name, _ in self.target_modules(True)]
+        # student_entries = [name for name, _ in self.target_modules(True)]
+
+        # logger.debug("Teacher attention maps are build from: ")
 
     def attention_map(self, features):
         """ Adopted from the RepDistiller repository."""
@@ -111,6 +146,10 @@ class AttentionDistill(nn.Module):
         """ Ensures that there are hooks in a module."""
 
         def save_activation(module, inputs, outputs):
+            if isinstance(outputs, tuple):
+                # This can be removed when we only 
+                # use the hooks to get activations from models.
+                outputs = outputs[0]
             if is_teacher:
                 self.teacher_activations[module_name] = outputs
             else:
@@ -123,17 +162,14 @@ class AttentionDistill(nn.Module):
         module.__activation_hook = None
 
     def target_modules(self, is_teacher: bool):
-        # This is only for resnet architectures.
+        # This currently works only for resnet architectures.
+        selector = re.compile(r"[a-z0-9\.]*layer[0-9]+")
+        network = self.teacher if is_teacher else self.network
 
-        layer_names = ["layer1", "layer2", "layer3"]
-
-        if is_teacher:
-            teacher = self.teacher.network
-            for ln in layer_names:
-                yield ln, getattr(teacher, ln)[-1].bn2
-        else:
-            for ln in layer_names:
-                yield ln, getattr(self.network, ln)[-1].bn2
+        for name, module in network.named_modules():
+            if selector.fullmatch(name) is None:
+                continue
+            yield name.split(".")[-1], module
 
     def prepare_activations(self):
         if isinstance(self.teacher, DatabaseNetwork):
@@ -172,7 +208,7 @@ class AttentionDistill(nn.Module):
         at_loss = self.beta * sum(at_losses)
         stats["loss_AT"] = at_loss
 
-        # Reset everything.
+        # Reset everything to delete the graphs (student).
         self.student_activations = {}
         self.teacher_activations = {}
 
@@ -530,3 +566,4 @@ class Augmix_CRD_Loss(nn.Module):
         }
 
         return loss_cls + loss_kd + loss_crd, stats
+

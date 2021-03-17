@@ -1,7 +1,7 @@
 # @package _group_
 
 name: resnet18
-model_path: ${path.model}/standard
+model_path: ${path.model}/augmix
 ckpt_path: null
 num_classes: ${network.num_classes}
 group: ${network.group}

@@ -56,7 +56,7 @@ class VisionModule(pl.LightningModule):
 
         super(VisionModule, self).__init__()
         self.network = network
-        self.train_loss = StandardLoss() if train_loss is None else train_loss
+        self.train_loss = StandardLoss(network) if train_loss is None else train_loss
         self.val_loss = StandardLoss(network)
         self.optimizer_fn = optimizer_fn
         self.scheduler_fn = scheduler_fn
@@ -101,7 +101,7 @@ class VisionModule(pl.LightningModule):
         )
 
     def test_step(self, batch, batch_idx, dataset_idx=0):
-        idx, x, y = batch
+        _, x, y = batch
         #print(x)
         self.test_acc[self.test_labels[dataset_idx]](
             y, torch.argmax(self(x), -1)
@@ -165,6 +165,9 @@ class PrunedModule(VisionModule):
 
         info = self.prune_fn(self.network)
         self.print(f"\n {info.summary()}")
+        self.print("The effective compression ratio is {}".format(info.network_comp()))
+        self.print("The effective num of params is {}".format(info.network_size()))
+
 
     # def on_train_epoch_start(self):
     #     if self.trainer.current_epoch == self.T_prune_end:
@@ -173,3 +176,4 @@ class PrunedModule(VisionModule):
     #         optimizers, lr_schedulers = self.configure_optimizers()
     #         self.trainer.optimizers = optimizers
     #         self.trainer.lr_schedulers = lr_schedulers
+

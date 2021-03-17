@@ -2,7 +2,7 @@
 
 _target_: pruneshift.networks.create_network
 name: resnet18
-model_path: ${path.model}/standard
+model_path: ${path.model}/augmix
 ckpt_path: null
 version: 0
 

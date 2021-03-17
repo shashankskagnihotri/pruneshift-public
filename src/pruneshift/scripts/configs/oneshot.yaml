@@ -10,7 +10,8 @@ defaults:
 
 prune:
     method: global_weight
-    ratio: 2
+    ratio: null
+    amount: 0.5
 
 trainer:
     weights_summary: null

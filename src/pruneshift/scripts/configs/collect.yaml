@@ -7,9 +7,6 @@ defaults:
 network:
     imagenet_subset: False
 
-datamodule:
-    only_test_transforms: True
-
 save_path: ???
 
 seed: 0
