@@ -1,0 +1,16 @@
+# @package _global_
+
+path:
+    logdir: /work/dlclarge2/hoffmaja-pruneshift/debug_runs/${now:%Y-%m-%d}/${now:%H-%M-%S}
+    checkpoint: ${path.logdir}/model_ckpts/
+    dataset: /work/dlclarge2/hoffmaja-pruneshift/datasets
+    model: /work/dlclarge2/hoffmaja-pruneshift/models
+    imagenet100: /work/dlclarge2/hoffmaja-pruneshift/ILSVRC2012-100
+    imagenet200: null
+    imagenet1000: /data/datasets/ILSVRC2012
+    deepaugment: /data/datasets/DeepAugment
+
+hydra:
+    run:
+        dir: ${path.logdir}
+
