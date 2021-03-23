@@ -2,10 +2,10 @@
 
 _target_: pruneshift.losses.Augmix_CRD_Loss
 alpha: 12.
-beta: 0.1
+beta: 0.4
 kd_T: 4.
-charlie: 0.1
-delta: 0.8
+charlie: 0.2
+delta: 0.4
 feat_dim: 128
 nce_k: 16384
 nce_t: 0.07

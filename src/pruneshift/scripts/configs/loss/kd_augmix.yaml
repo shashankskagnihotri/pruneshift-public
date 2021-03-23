@@ -2,6 +2,6 @@
 
 _target_: pruneshift.losses.AugmixKnowledgeDistill
 alpha: 12.
-beta: 0.5
+beta: 0.4
 kd_T: 4.
-charlie: 0.5
+charlie: 0.6

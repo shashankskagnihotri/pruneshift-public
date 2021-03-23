@@ -335,71 +335,29 @@ class CRD_Loss(nn.Module):
         self.criterion_kd = CRDLoss([s_dim, t_dim, n_data, feat_dim, nce_k, nce_t, nce_m])
 
     def forward(self, network: nn.Module, batch):
-        idx_crd, x_crd, y_crd = self.datamodule.train_dataset[0]
+        idx, x, y, contrast_idx = batch
         preact = False
         num_classes = 100
-        idx, x, y = batch
+        
 
-        percent = self.percent
-        label = y_crd
-        target = y_crd
-        target = target.cpu().detach().numpy()
-        num_samples = len(x_crd)
-        feat_dim = self.feat_dim
-
-        self.cls_positive = [[] for i in range(num_classes)]
-        for i in range(num_samples):
-            self.cls_positive[label[i]].append(i)
-
-        self.cls_negative = [[] for i in range(num_classes)]
-        for i in range(num_classes):
-            for j in range(num_classes):
-                if j == i:
-                    continue
-                self.cls_negative[i].extend(self.cls_positive[j])
-
-        self.cls_positive = [np.asarray(self.cls_positive[i]) for i in range(num_classes)]
-        self.cls_negative = [np.asarray(self.cls_negative[i]) for i in range(num_classes)]
-
-        if 0 < percent < 1:
-            n = int(len(self.cls_negative[0]) * percent)
-            self.cls_negative = [np.random.permutation(self.cls_negative[i])[0:n]
-                                 for i in range(num_classes)]
-
-        self.cls_positive = np.asarray(self.cls_positive)
-        self.cls_negative = np.asarray(self.cls_negative)
-
-        if self.mode == 'exact':
-            pos_idx = idx
-        elif self.mode == 'relax':
-            pos_idx = np.random.choice(self.cls_positive[target], 1)
-            pos_idx = pos_idx[0]
-
-        replace = True if self.k > len(self.cls_negative[target]) else False
-        neg_idx = np.random.choice(self.cls_negative[target], self.k, replace=replace)
-        sample_idx = np.hstack((np.asarray([pos_idx]), neg_idx))
-
-
-        comb_x = torch.cat(x)
-        contrast_idx = sample_idx[0]
+        self.network.is_feat = True
+        self.teacher.network.is_feat = True       
 
         criterion_dv = DistillKL(self.kd_T)
 
-        feat_s, logit_s = self.network(x, is_feat=True, preact=preact)
-        #self.teacher_network.eval()
-        
+
+        self.network.train()
+        feat_s, logit_s = self.network(x)
+        self.network.is_feat = False
         with torch.no_grad():
-            self.teacher.train()
-            feat_t, _ = self.teacher(idx, x, is_feat=True, preact=preact)
-            self.teacher.eval()
-            logit_t = self.teacher(idx, x, is_feat=True, preact=preact)
-            feat_t = [f.detach() for f in feat_t]
+            self.teacher.is_feat = True
+            feat_t, logit_t = self.teacher(idx, x)
         f_s = feat_s[-1]
+        f_s = f_s[0:64]
         f_t = feat_t[-1]
-        s_dim = feat_s[-1].shape[1]
-        t_dim = feat_t[-1].shape[1]
-        n_data = len(x.cpu().detach().numpy())
-        loss_crd = self.criterion_kd(f_s, f_t, idx, constrast_idx) * self.delta
+        f_t = f_t[0:64]
+
+        loss_crd = self.criterion_kd(f_s, f_t, idx, contrast_idx) * self.delta
         loss = F.cross_entropy(logits, y) * self.gamma
         loss_kd = criterion_dv(logits, teacher_logits) * self.charlie
         acc = accuracy(torch.argmax(logits, 1), y)
@@ -467,8 +425,6 @@ class Augmix_CRD_Loss(nn.Module):
         f_s = f_s[0:64]
         f_t = feat_t[-1]
         f_t = f_t[0:64]
-        #print('f_s shape: ', f_s.size())
-        #f_t = feat_t[-1]        
 
         loss_crd = self.criterion_kd(f_s, f_t, idx, contrast_idx) * self.delta
 
