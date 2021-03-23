@@ -32,25 +32,25 @@ class ContrastMemory(nn.Module):
         batchSize = v1.size(0)
         outputSize = self.memory_v1.size(0)
         inputSize = self.memory_v1.size(1)
-        print('y: ',y)
-        print(y.size())
-        print('outputsize: ', outputSize)
-        print('inputSize: ', inputSize)
+        #print('y: ',y)
+        #print(y.size())
+        #print('outputsize: ', outputSize)
+        #print('inputSize: ', inputSize)
 
         # original score computation
         if idx is None:
             idx = self.multinomial.draw(batchSize * (self.K + 1)).view(batchSize, -1)
             idx.select(1, 0).copy_(y.data)
         # sample
-        print('memory_v1: ', self.memory_v1)
-        print(self.memory_v1.size())
-        print('idx: ', idx)
-        print(idx.size())
+        #print('memory_v1: ', self.memory_v1)
+        #print('memory_v1 size: ', self.memory_v1.size())
+        #print('idx: ', idx)
+        #print(idx.size())
         weight_v1 = torch.index_select(self.memory_v1, 0, idx.view(-1)).detach()
-        print('weight_v1: ', weight_v1.size())
-        print('batchsize: ', batchSize)
-        print('K+1: ', K+1)
-        print('inputSize: ', inputSize)
+        #print('weight_v1: ', weight_v1.size())
+        #print('batchsize: ', batchSize)
+        #print('K+1: ', K+1)
+        #print('inputSize: ', inputSize)
         weight_v1 = weight_v1.view(batchSize, K + 1, inputSize)
         out_v2 = torch.bmm(weight_v1, v2.view(batchSize, inputSize, 1))
         out_v2 = torch.exp(torch.div(out_v2, T))
@@ -64,11 +64,11 @@ class ContrastMemory(nn.Module):
         if Z_v1 < 0:
             self.params[2] = out_v1.mean() * outputSize
             Z_v1 = self.params[2].clone().detach().item()
-            print("normalization constant Z_v1 is set to {:.1f}".format(Z_v1))
+            #print("normalization constant Z_v1 is set to {:.1f}".format(Z_v1))
         if Z_v2 < 0:
             self.params[3] = out_v2.mean() * outputSize
             Z_v2 = self.params[3].clone().detach().item()
-            print("normalization constant Z_v2 is set to {:.1f}".format(Z_v2))
+            #print("normalization constant Z_v2 is set to {:.1f}".format(Z_v2))
 
         # compute out_v1, out_v2
         out_v1 = torch.div(out_v1, Z_v1).contiguous()

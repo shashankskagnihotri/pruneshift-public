@@ -20,6 +20,7 @@ from .datasets import TransformWrapper
 from .datasets import SplitImageFolder
 from .datasets import ImageFolderSubset
 from augmix.dataset import AugMixWrapper
+from .datasets import CRDWrapper
 
 logger = logging.getLogger(__name__)
 
@@ -63,6 +64,7 @@ class ShiftDataModule(pl.LightningDataModule):
         test_corrupted: bool = True,
         test_renditions: bool = False,
         with_normalize: bool = True,
+        crd: bool = False,
         only_test_transform: bool = False,
     ):
         super(ShiftDataModule, self).__init__()
@@ -71,6 +73,7 @@ class ShiftDataModule(pl.LightningDataModule):
         self.batch_size = batch_size
         self.num_workers = num_workers
         self.augmix = augmix
+        self.crd = crd
         self.deepaugment_path = deepaugment_path
         self.test_train = test_train
         self.test_corrupted = test_corrupted
@@ -151,7 +154,7 @@ class ShiftDataModule(pl.LightningDataModule):
     def set_transforms(self):
         """Creates the corresponding transforms."""
 
-        # 1. Create the correct preprocessing transforms and 
+        # 1. Create the correct preprocessing transforms and
         #    set the test resolutions.
         self.train_transform, self.test_transform = None, None
 
@@ -234,13 +237,19 @@ class ShiftDataModule(pl.LightningDataModule):
             # 4. Add standard augmentation or augmix to the training set.
             if not self.augmix:
                 comb = compose(self.train_transform, self.normalize)
-                train_dataset = TransformWrapper(train_dataset, comb, with_idx=True)
+                if self.crd:
+                    train_dataset = CRDWrapper(train_dataset, comb, with_idx = True)
+                else:
+                    train_dataset = TransformWrapper(train_dataset, comb, with_idx=True)
             else:
                 train_dataset = TransformWrapper(train_dataset, self.train_transform)
                 no_jsd = True if self.augmix == "no_jsd" else False
                 train_dataset = AugMixWrapper(train_dataset, self.normalize, no_jsd)
                 # Add indices to the samples.
-                train_dataset = TransformWrapper(train_dataset, None, with_idx=True)
+                if self.crd:
+                    train_dataset = CRDWrapper(train_dataset, None, with_idx=True)
+                else:
+                    train_dataset = TransformWrapper(train_dataset, None, with_idx=True)
 
             # 5. Set the training and validation set.
             self.train_dataset = train_dataset
@@ -284,6 +293,7 @@ class ShiftDataModule(pl.LightningDataModule):
             num_workers=self.num_workers,
             pin_memory=True,
             shuffle=train,
+            drop_last = train,
         )
 
     def train_dataloader(self):

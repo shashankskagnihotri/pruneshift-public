@@ -181,6 +181,7 @@ class ResNet(nn.Module):
         self.dropout = dropout
         self.inplanes = 64
         self.dilation = 1
+        self.is_feat=False
         
         if replace_stride_with_dilation is None:
             # each element in the tuple indicates if we should replace
@@ -276,11 +277,8 @@ class ResNet(nn.Module):
     
     def _forward_impl(self, x: Tensor) -> Tensor:
         # See note [TorchScript super()]
-        if self.training:
-            is_feat = True
-        else:            
-            is_feat = False
-        is_feat = False
+
+        is_feat = self.is_feat
         preact = False
         #print(x)
         x = self.conv1(x)

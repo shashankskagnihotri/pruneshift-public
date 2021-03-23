@@ -119,6 +119,69 @@ class TransformWrapper(Dataset):
     def __len__(self):
         return len(self.dataset)
 
+class CRDWrapper(Dataset):
+    def __init__(self, dataset, transform, with_idx=False):
+        self.dataset = dataset
+        self.transform = transform
+        self.with_idx = with_idx
+        self.k = 16384
+        self.percent = 1.0
+        self.mode = 'exact'
+        
+        
+        current_dataset = dataset
+        while hasattr(current_dataset, 'dataset'):
+            current_dataset = current_dataset.dataset
+        label = current_dataset.targets
+        num_classes = len(set(label))
+        num_samples = len(dataset)
+        
+        self.cls_positive = [[] for i in range(num_classes)]
+        for i in range(num_samples):
+            self.cls_positive[label[i]].append(i)
+
+        self.cls_negative = [[] for i in range(num_classes)]
+        for i in range(num_classes):
+            for j in range(num_classes):
+                if j == i:
+                    continue
+                self.cls_negative[i].extend(self.cls_positive[j])
+
+        self.cls_positive = [np.asarray(self.cls_positive[i]) for i in range(num_classes)]
+        self.cls_negative = [np.asarray(self.cls_negative[i]) for i in range(num_classes)]
+
+        if 0 < self.percent < 1:
+            n = int(len(self.cls_negative[0]) * self.percent)
+            self.cls_negative = [np.random.permutation(self.cls_negative[i])[0:n]
+                                 for i in range(num_classes)]
+
+        self.cls_positive = np.asarray(self.cls_positive)
+        self.cls_negative = np.asarray(self.cls_negative)
+
+    def __getitem__(self, idx):
+        x, y = self.dataset[idx]
+        target = y
+        
+        if self.mode == 'exact':
+            pos_idx = idx
+        elif self.mode == 'relax':
+            pos_idx = np.random.choice(self.cls_positive[target], 1)
+            pos_idx = pos_idx[0]
+
+        #print('pos_idx', pos_idx)
+        replace = True if self.k > len(self.cls_negative[target]) else False
+        neg_idx = np.random.choice(self.cls_negative[target], self.k, replace=replace)
+        sample_idx = np.hstack((np.asarray([pos_idx]), neg_idx))
+
+        if self.transform is not None:
+            x = self.transform(x)
+
+        if self.with_idx:
+            return idx, x, y, sample_idx
+        return x, y
+
+    def __len__(self):
+        return len(self.dataset)
 
 class ExternalDataset(Dataset):
     dir_name: str = None
