@@ -35,7 +35,7 @@ def oneshot(cfg):
 
     module = PrunedModule(network=network,
                           prune_fn=prune_fn,
-                          test_labels=data.labels,
+                          datamodule=data,
                           optimizer_fn=optimizer_fn,
                           scheduler_fn=scheduler_fn,
                           train_loss=train_loss)

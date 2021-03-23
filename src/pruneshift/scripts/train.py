@@ -26,7 +26,7 @@ def train(cfg):
     train_loss = create_loss(cfg, network, data)
 
     module = VisionModule(network=network,
-                          test_labels=data.labels,
+                          datamodule=data,
                           optimizer_fn=optimizer_fn,
                           scheduler_fn=scheduler_fn,
                           train_loss=train_loss)

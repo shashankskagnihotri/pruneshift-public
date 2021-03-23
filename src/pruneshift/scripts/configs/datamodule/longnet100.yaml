@@ -1,0 +1,25 @@
+# @package _global_
+
+datamodule:
+    name: imagenet
+    root: ${path.imagenet100}
+    num_workers: 6 
+    augmix: False
+    test_corrupted: True
+    test_renditions: True
+    batch_size: 256
+
+network:
+    num_classes: 100
+    group: imagenet
+
+scheduler:
+    _target_: pruneshift.modules.MultiStepWarmUpLr
+    warmup_end: 5 
+    milestones: [60, 120, 160]
+
+trainer:
+    max_epochs: 180 
+
+optimizer:
+    lr: 0.1

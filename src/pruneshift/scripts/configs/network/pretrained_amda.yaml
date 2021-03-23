@@ -1,0 +1,8 @@
+# @package _group_
+
+_target_: pruneshift.networks.create_network
+name: resnet18
+model_path: ${path.model}/deep_augmix
+ckpt_path: null
+version: 0
+

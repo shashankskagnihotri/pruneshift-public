@@ -26,6 +26,7 @@ class StandardLoss(nn.Module):
         self.network = network
 
     def forward(self, batch):
+        # self.network.train()
         _, x, y = batch
         logits = self.network(x)
         loss = F.cross_entropy(logits, y)

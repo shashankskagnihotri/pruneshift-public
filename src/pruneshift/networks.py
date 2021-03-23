@@ -17,6 +17,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torchvision.models as imagenet_models
+import torchvision.models.mnasnet as mnasnet
 import timm
 import pytorch_lightning as pl
 
@@ -28,6 +29,8 @@ import models as models
 
 logger = logging.getLogger(__name__)
 
+# Bugfix otherwise eval mode does not work for mnasnet architectures.
+mnasnet._BN_MOMENTUM = 0.1
 
 # NETWORK_REGEX = re.compile(
 #     r"(?P<group>[a-zA-Z]+)(?P<num_classes>[0-9]+)_(?P<name>[a-zA-Z0-9_]+)"
@@ -46,8 +49,11 @@ def protect_classifier(name: str, network: nn.Module):
         network.classifier[-1].is_protected = True
     elif name[:8] == "densenet":
         network.classifier.is_protected = True
+    elif name[:7] == "mnasnet":
+        network.classifier[-1].is_protected = True
     else:
         raise NotImplementedError
+
 
 
 def create_network(

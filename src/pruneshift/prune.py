@@ -29,6 +29,7 @@ class L1GradUnstructered(prune_torch.L1Unstructured):
     def compute_mask(self, t, default_mask):
         return super(L1GradUnstructered, self).compute_mask(t.grad, default_mask)
 
+
 class ZeroWeights(prune_torch.CustomFromMask):
     """ Prunes all the zero weights, for checkpoints from other frameworks."""
     def compute_mask(self, t, default_mask):
@@ -47,6 +48,7 @@ def unwider_resnet(module: nn.Module, name: str, amount: float):
         init = torch.zeros_like(t).normal_(0, std)
         setattr(module, name, nn.Parameter(init))
         prune_torch.random_structured(module, name, amount, dim=0)
+
     else:
         raise NotImplementedError
 
@@ -96,7 +98,7 @@ def prune(
         pruning_cls = L1GradUnstructered
         layerwise = True
         raise NotImplementedError
-    elif method == "unwider_resnet":
+    elif method == "uniform":
         pruning_cls = unwider_resnet
         layerwise = True
     elif method == "l1_channels":
@@ -151,3 +153,4 @@ def simple_prune(
                 continue
 
             pruning_method.apply(submodule, param_name, **kwargs)
+

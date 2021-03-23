@@ -82,6 +82,7 @@ class ShiftDataModule(pl.LightningDataModule):
         self.train_transform = None
         self.test_transform = None
         self.normalize = None
+        self.test_resolution = None
         self.set_transforms()
 
         # These are created by the setup method.
@@ -150,7 +151,8 @@ class ShiftDataModule(pl.LightningDataModule):
     def set_transforms(self):
         """Creates the corresponding transforms."""
 
-        # 1. Create the correct preprocessing transforms.
+        # 1. Create the correct preprocessing transforms and 
+        #    set the test resolutions.
         self.train_transform, self.test_transform = None, None
 
         if self.name == "cifar10" or self.name == "cifar100":
@@ -160,6 +162,8 @@ class ShiftDataModule(pl.LightningDataModule):
                     transforms.RandomHorizontalFlip(),
                 ]
             )
+            self.test_resolution = (3, 32, 32)
+
         else:  # self.name == "imagenet":
             self.train_transform = transforms.Compose(
                 [
@@ -173,6 +177,7 @@ class ShiftDataModule(pl.LightningDataModule):
                     transforms.CenterCrop(224),
                 ]
             )
+            self.test_resolution = (3, 224, 224)
 
         if self.only_test_transform:
             self.train_transform = self.test_transform

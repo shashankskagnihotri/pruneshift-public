@@ -43,14 +43,26 @@ def load_state_dict(path: Union[str, Path]):
 
     state_dict = state_dict["state_dict"]
 
+    # Check wether there are is meta data in the state_dict, this is
+    # necessary for mnasnet. Note this is just a quickfix.
+    if hasattr(state_dict, "_metadata"):
+        return state_dict
+
+    # Some old checkpoints do have the train_loss and val_loss state dicts.
+    state_dict = {n: p for n, p in state_dict.items() if not n[: 3] == "val"}
+    
+
     def prune_name(name):
         idx = name.find(".")
         # Prune the network part due to the lightning module.
+        if name[: idx] == "train_loss":
+            return prune_name(name[idx + 1 :]) 
         if name[: idx] == "network":
             return name[idx + 1 :]
         if name[: idx] == "module":
             return name[idx + 1 :]
-        return name 
+        return name
+
 
     return {prune_name(n): p for n, p in state_dict.items()}
 

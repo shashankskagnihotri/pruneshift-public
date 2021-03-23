@@ -55,7 +55,7 @@ def flops(
     pass
 
 
-DEFAULT_TARGETS = {nn.Linear: ["weight", "bias"], nn.Conv2d: ["weight", "bias"]}
+DEFAULT_TARGETS = {nn.Linear: ["weight", "bias"], nn.Conv2d: ["weight"]}
 
 
 class PruneInfo:

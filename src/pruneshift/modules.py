@@ -10,6 +10,7 @@ import pytorch_lightning as pl
 from pytorch_lightning.metrics import Accuracy
 from pytorch_lightning.metrics.functional import accuracy
 from pytorch_lightning.metrics import functional
+from pytorch_lightning.utilities import rank_zero_only
 import torch
 import torch.nn as nn
 from torch.nn.utils.prune import is_pruned
@@ -18,6 +19,8 @@ from torch.optim.lr_scheduler import LambdaLR
 from torch.nn import functional as F
 
 from pruneshift.losses import StandardLoss
+from pruneshift.utils import get_model_complexity_prune
+from pruneshift.datamodules import ShiftDataModule
 
 
 logger = logging.getLogger(__name__)
@@ -48,7 +51,7 @@ class VisionModule(pl.LightningModule):
     def __init__(
         self,
         network: nn.Module,
-        test_labels: Sequence[str] = None,
+        datamodule: ShiftDataModule,
         train_loss: nn.Module = None,
         optimizer_fn=optim.Adam,
         scheduler_fn=None,
@@ -57,21 +60,35 @@ class VisionModule(pl.LightningModule):
         super(VisionModule, self).__init__()
         self.network = network
         self.train_loss = StandardLoss(network) if train_loss is None else train_loss
+        self.datamodule = datamodule 
         self.val_loss = StandardLoss(network)
         self.optimizer_fn = optimizer_fn
         self.scheduler_fn = scheduler_fn
 
-        if test_labels is None:
-            self.test_labels = ["acc"]
-        else:
-            self.test_labels = [f"acc_{l}" for l in test_labels]
+        # Prepare the metrics.
+        self.test_labels = [f"acc_{l}" for l in self.datamodule.labels]
         self.test_acc = nn.ModuleDict({l: Accuracy() for l in self.test_labels})
+
+    def on_train_start(self):
+        # This introduces a bug!!!
+        # self.model_stats()
+        return
+
+    # @rank_zero_only
+    def model_stats(self):
+        test_res = self.datamodule.test_resolution
+        num_flops, _ = get_model_complexity_prune(self.network, test_res)
+        self.print(f"\n The number of flops is {num_flops}")
 
     def forward(self, x):
         return self.network(x)
 
     def state_dict(self, *args, **kwargs):
         """ Make sure only the trained network is used for saving."""
+        # This is a dirty quickfix, but otherwise we can not switch
+        # efficiently, between different losses.
+        # Note that this also breaks compatibility with newer lightning
+        # versions.
         return self.network.state_dict(*args, **kwargs)
 
     def training_step(self, batch, batch_idx):        
@@ -144,14 +161,14 @@ class PrunedModule(VisionModule):
         self,
         network: nn.Module,
         prune_fn: Callable,
-        test_labels: Sequence[str] = None,
+        datamodule,
         train_loss: nn.Module = None,
         optimizer_fn=optim.Adam,
         scheduler_fn=None,
     ):
         super(PrunedModule, self).__init__(
             network=network,
-            test_labels=test_labels,
+            datamodule=datamodule,
             train_loss=train_loss,
             optimizer_fn=optimizer_fn,
             scheduler_fn=scheduler_fn,
@@ -160,13 +177,12 @@ class PrunedModule(VisionModule):
         self.prune_fn = prune_fn
 
     def setup(self, stage: str):
-        if is_pruned(self.network):
-            return
-
-        info = self.prune_fn(self.network)
-        self.print(f"\n {info.summary()}")
-        self.print("The effective compression ratio is {}".format(info.network_comp()))
-        self.print("The effective num of params is {}".format(info.network_size()))
+        # Prune only at the beginning of the training phase.
+        if stage == "fit":
+            info = self.prune_fn(self.network)
+            self.print(f"\n {info.summary()}")
+            self.print("The effective compression ratio is {}".format(info.network_comp()))
+            self.print("The effective num of params is {}".format(info.network_size()))
 
 
     # def on_train_epoch_start(self):

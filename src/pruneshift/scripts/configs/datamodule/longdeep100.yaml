@@ -1,0 +1,26 @@
+# @package _global_
+
+datamodule:
+    name: imagenet
+    root: ${path.imagenet100}
+    deepaugment_path: ${path.deepaugment}
+    num_workers: 6 
+    augmix: False
+    test_corrupted: True
+    test_renditions: True
+    batch_size: 256
+
+network:
+    num_classes: 100
+    group: imagenet
+
+scheduler:
+    _target_: pruneshift.modules.MultiStepWarmUpLr
+    warmup_end: 5 
+    milestones: [20, 40, 53]
+
+trainer:
+    max_epochs: 60 
+
+optimizer:
+    lr: 0.1

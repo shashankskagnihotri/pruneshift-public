@@ -1,4 +1,5 @@
 defaults:
+    - hydra/launcher: submitit_slurm
     - checkpoint: last
     - path: standard
     - loss: standard
