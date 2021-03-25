@@ -57,7 +57,7 @@ def js_divergence(logits0, logits1, logits2):
 
 
 class StandardLoss(nn.Module):
-    def __init__(self, network: nn.Module, **kwargs):
+    def __init__(self, network: nn.Module, datamodule=None):
         super(StandardLoss, self).__init__()
         self.network = network
 
@@ -74,8 +74,8 @@ class AugmixLoss(nn.Module):
     def __init__(
             self,
             network: nn.Module,
+            datamodule,
             augmix_alpha: float = 12.0,
-            **kwargs,
     ):
         """Implements the AugmixLoss from the augmix paper.
 
@@ -106,6 +106,7 @@ class KnowledgeDistill(nn.Module):
     def __init__(
             self,
             network: nn.Module,
+            datamodule,
             teacher: Teacher,
             augmix: bool = False,
             augmix_alpha: float = 12.,
@@ -113,7 +114,6 @@ class KnowledgeDistill(nn.Module):
             kd_T: float = 4.0,
             kd_mixture: float = 0.9,
             only_smooth: bool = False,
-            **kwargs,
     ):
         super(KnowledgeDistill, self).__init__()
         self.network = network
@@ -180,11 +180,11 @@ class AugmixKnowledgeDistill(KnowledgeDistill):
             self,
             network: nn.Module,
             teacher: Teacher,
+            datamodule,
             kd_T: float = 4.0,
             kd_mixture: float = 0.5,
             only_smooth: bool = 0.5,
             augmix_alpha: float = 6.0,
-            **kwargs,
     ):
         super(AugmixKnowledgeDistill, self).__init__(network, teacher, kd_T, kd_mixture, only_smooth)
         self.augmix_alpha = augmix_alpha  # scaling for the augmix loss
@@ -261,6 +261,7 @@ class AttentionDistill(nn.Module):
             self,
             network: nn.Module,
             teacher: Teacher,
+            datamodule,
             p: float = 1.0,
             beta: float = 2.0,
             augmix: bool = False,
