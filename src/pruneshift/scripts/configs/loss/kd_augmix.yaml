@@ -5,7 +5,7 @@ loss:
   augmix_alpha: 12.
   beta: 1.
   kd_T: 4.
-  charlie: 0.6
+  kd_mixture: 0.9
   augmix: True
 
 datamodule:
