@@ -8,6 +8,7 @@ from ptflops import get_model_complexity_info
 import torch.nn.utils.prune as torch_prune
 import torch.nn as nn
 import torch
+from torchvision.models.mnasnet import MNASNet
 
 from pruneshift.prune_hydra import hydrate
 from pruneshift.prune_hydra import dehydrate
@@ -17,7 +18,7 @@ from pruneshift.prune_hydra import is_hydrated
 
 def safe_ckpt_load(network: nn.Module, path: Union[str, Path]):
     """ Safe way to load a network."""
-    state_dict = load_state_dict(path)
+    state_dict = load_state_dict(network, path)
     hydrated, pruned = False, False
 
     for param_name in state_dict:
@@ -34,7 +35,7 @@ def safe_ckpt_load(network: nn.Module, path: Union[str, Path]):
         network.load_state_dict(state_dict)
 
 
-def load_state_dict(path: Union[str, Path]):
+def load_state_dict(network, path: Union[str, Path]):
     """ Loads a state_dict """
     state_dict = torch.load(path, map_location=lambda storage, loc: storage)
 
@@ -45,8 +46,12 @@ def load_state_dict(path: Union[str, Path]):
 
     # Check wether there are is meta data in the state_dict, this is
     # necessary for mnasnet. Note this is just a quickfix.
-    if hasattr(state_dict, "_metadata"):
+    if hasattr(state_dict, "_metadata") and isinstance(network, MNASNet):
         return state_dict
+
+    # Some old checkpoints do have the train_loss and val_loss state dicts.
+    state_dict = {n: p for n, p in state_dict.items() if not n[: 3] == "val"}
+    
 
     # Some old checkpoints do have the train_loss and val_loss state dicts.
     state_dict = {n: p for n, p in state_dict.items() if not n[: 3] == "val"}

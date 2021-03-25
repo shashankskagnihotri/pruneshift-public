@@ -4,7 +4,6 @@ datamodule:
     name: imagenet
     root: ${path.imagenet100}
     num_workers: 6 
-    augmix: False
     test_corrupted: True
     test_renditions: True
     batch_size: 256

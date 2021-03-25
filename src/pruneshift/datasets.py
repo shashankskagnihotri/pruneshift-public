@@ -119,6 +119,7 @@ class TransformWrapper(Dataset):
     def __len__(self):
         return len(self.dataset)
 
+
 class CRDWrapper(Dataset):
     def __init__(self, dataset, transform, with_idx=False):
         self.dataset = dataset

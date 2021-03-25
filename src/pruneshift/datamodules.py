@@ -93,6 +93,14 @@ class ShiftDataModule(pl.LightningDataModule):
         self.val_dataset = None
         self.test_dataset = None
 
+    def train_length(self):
+        if self.name == "cifar10":
+            return 50000
+        elif self.name == "cifar100":
+            return 50000
+        # TODO (Jasper): Fix this in the end.
+        return 129756
+
     def create_dataset(self, train: bool):
         # TODO: Add the possibility of a val_split again.
         if self.name == "cifar10":

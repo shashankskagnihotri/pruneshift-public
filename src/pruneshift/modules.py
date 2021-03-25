@@ -8,15 +8,10 @@ import re
 
 import pytorch_lightning as pl
 from pytorch_lightning.metrics import Accuracy
-from pytorch_lightning.metrics.functional import accuracy
-from pytorch_lightning.metrics import functional
-from pytorch_lightning.utilities import rank_zero_only
 import torch
 import torch.nn as nn
-from torch.nn.utils.prune import is_pruned
 import torch.optim as optim
 from torch.optim.lr_scheduler import LambdaLR
-from torch.nn import functional as F
 
 from pruneshift.losses import StandardLoss
 from pruneshift.utils import get_model_complexity_prune

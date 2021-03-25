@@ -164,8 +164,11 @@ class ImagenetSubsetWrapper(nn.Module):
         super_root: str = None,
     ):
         super(ImagenetSubsetWrapper, self).__init__()
-        root = f"/misc/scratchSSD2/datasets/ILSVRC2012-{num_classes}/train"
-        super_root = "/misc/scratchSSD2/datasets/ILSVRC2012/train"
+        # TODO: Finally make this parameterizable.
+        # root = f"/misc/scratchSSD2/datasets/ILSVRC2012-{num_classes}/train"
+        # super_root = "/misc/scratchSSD2/datasets/ILSVRC2012/train"
+        super_root = "/data/datasets/ILSVRC2012/train"
+        root = f"/work/dlclarge2/hoffmaja-pruneshift/datasets/ILSVRC2012-{num_classes}/train"
         self.num_classes = num_classes
         self.root = root
         self.super_root = super_root

@@ -1,5 +1,8 @@
-# @package _group_
+# @package _global_
+loss:
+  _target_: pruneshift.losses.AugmixLoss
+  alpha: 12.
+  beta: 1.
 
-_target_: pruneshift.losses.AugmixLoss
-alpha: 12.
-beta: 1.
+datamodule:
+  augmix: True

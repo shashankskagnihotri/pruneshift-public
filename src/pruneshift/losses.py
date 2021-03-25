@@ -1,10 +1,20 @@
 """ Implements losses and criterions."""
-import math
-from typing import Optional
-import re
-import logging
 
-import numpy as np
+# TODO: Rename everything.
+# TODO: 1. AT loss
+# TODO: 1.1.: Add augmix variant.
+# TODO: 1.2.: Outsource the hook stuff as a mixin (One part should recognize the targeted modules).
+#             Which will be needed by crd to be dynamically.
+# TODO: 1.3.: Double check everything.
+# TODO: 2. CRD loss
+# TODO: 2.1.: Add the hook mixin.
+# TODO: 2.2.: Update both variants.
+# TODO: 2.3.: Double check everything.
+# TODO: 2.4.: Do we need to compensate for pruning in the readout layer.
+import logging
+from typing import Dict
+from collections import UserDict
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -13,13 +23,39 @@ from pytorch_lightning.metrics.functional import accuracy
 from distiller_zoo import DistillKL
 from crd.criterion import CRDLoss
 from pruneshift.teachers import Teacher
-from pruneshift.teachers import DatabaseNetwork
-from torch.utils.data import DataLoader
-
+from pruneshift.network_markers import at_entry_points
+from pruneshift.network_markers import classifier
 
 logger = logging.getLogger(__name__)
 
-    
+
+# What is missing?
+# AT augmix
+# AT supporting multiple architectures!
+# CRD supporting multiple architectures!
+
+
+def js_divergence(logits0, logits1, logits2):
+    """ Calculates the Jensen-Shannon divergence.
+
+    Adopted from ImageNet-R: https://github.com/hendrycks/imagenet-r
+    """
+    p_clean, p_aug1, p_aug2 = (
+        F.softmax(logits0, dim=1),
+        F.softmax(logits1, dim=1),
+        F.softmax(logits2, dim=1),
+    )
+
+    # Clamp mixture distribution to avoid exploding KL divergence
+    p_mixture = torch.clamp((p_clean + p_aug1 + p_aug2) / 3.0, 1e-7, 1).log()
+
+    return (
+                   F.kl_div(p_mixture, p_clean, reduction="batchmean")
+                   + F.kl_div(p_mixture, p_aug1, reduction="batchmean")
+                   + F.kl_div(p_mixture, p_aug2, reduction="batchmean")
+           ) / 3.0
+
+
 class StandardLoss(nn.Module):
     def __init__(self, network: nn.Module, **kwargs):
         super(StandardLoss, self).__init__()
@@ -34,92 +70,214 @@ class StandardLoss(nn.Module):
         return loss, {"acc": acc}
 
 
+class AugmixLoss(nn.Module):
+    def __init__(
+            self,
+            network: nn.Module,
+            augmix_alpha: float = 12.0,
+            **kwargs,
+    ):
+        """Implements the AugmixLoss from the augmix paper.
+
+        Args:
+            alpha: Multiplitave factor for the jensen-shannon divergence.
+        """
+        super(AugmixLoss, self).__init__()
+        self.network = network
+        self.augmix_alpha = augmix_alpha
+
+    def forward(self, batch):
+        idx, x, y = batch
+
+        # Split the augmix samples.
+        logits = self.network(torch.cat(x))
+        logits = torch.split(logits, len(logits) // 3)
+
+        loss_js = self.augmix_alpha * js_divergence(*logits)
+        loss = F.cross_entropy(logits[0], y)
+        acc = accuracy(torch.argmax(logits[0], 1), y)
+
+        stats = {"acc": acc, "kl_loss": loss, "augmix_loss": loss_js}
+
+        return loss + loss_js, stats
+
+
 class KnowledgeDistill(nn.Module):
     def __init__(
-        self,
-        network: nn.Module,
-        teacher: Teacher,
-        kd_T: float = 4.0,
-        gamma: float = 0.1,
-        charlie: float = 0.9,
-        only_smooth: bool = False,
-        **kwargs,
+            self,
+            network: nn.Module,
+            teacher: Teacher,
+            augmix: bool = False,
+            augmix_alpha: float = 12.,
+            beta: float = 1,
+            kd_T: float = 4.0,
+            kd_mixture: float = 0.9,
+            only_smooth: bool = False,
+            **kwargs,
     ):
         super(KnowledgeDistill, self).__init__()
         self.network = network
         self.teacher = teacher
         self.kd_T = kd_T  # temperature for KD
-        self.gamma = gamma  # scaling for the classification loss
-        self.charlie = charlie  # scaling for the KD loss
-        self.only_smooth = only_smooth 
+        self.kd_mixture = kd_mixture  # scaling for the KD loss
+        self.only_smooth = only_smooth
+        self.augmix = augmix
+        self.augmix_alpha = augmix_alpha
+        self.beta = beta
 
     def kd_loss(self, student_logits, teacher_logits, y):
         batch_size = teacher_logits.shape[0]
         num_classes = teacher_logits.shape[1]
 
-        p_t = F.softmax(teacher_logits/self.kd_T, dim=1)
+        p_t = F.softmax(teacher_logits / self.kd_T, dim=1)
+
+        if self.augmix:
+            y = torch.cat([y] * 3)
 
         if self.only_smooth:
             # Just use the smoothing effect.
             # This implementation could probably be more efficient.
             class_p = p_t[range(batch_size), y]
             non_class_p = (1 - class_p) / (num_classes - 1)
-            p_t = torch.zeros_like(p_t) + non_class_p[:, None] 
+            p_t = torch.zeros_like(p_t) + non_class_p[:, None]
             p_t[range(batch_size), y] = class_p
 
-        p_s = F.log_softmax(student_logits/self.kd_T, dim=1)
-        loss = F.kl_div(p_s, p_t, size_average=False) * (self.kd_T**2) / batch_size
+        p_s = F.log_softmax(student_logits / self.kd_T, dim=1)
+        loss = F.kl_div(p_s, p_t, size_average=False) * (self.kd_T ** 2) / batch_size
 
         return loss
 
     def forward(self, batch):
         idx, x, y = batch
-        logits = self.network(x)
-        # print("\n\n\n\n")
-        # print(logits)
 
-        # TODO: This line could be problematic due to distribution shift.
-        # TODO: We should think about the batchnorm layers. 
-        # self.teacher.eval()
+        if self.augmix:
+            x = torch.cat(x)
+
+        logits = self.network(x)
+
         with torch.no_grad():
             teacher_logits = self.teacher(idx, x)
 
-        loss = F.cross_entropy(logits, y) * self.gamma
-        loss_kd = self.charlie * self.kd_loss(logits, teacher_logits, y)
-        acc = accuracy(torch.argmax(logits, 1), y)
-        teacher_acc = accuracy(torch.argmax(teacher_logits, 1), y)
+        loss_kd = self.kd_mixture * self.kd_loss(logits, teacher_logits, y)
+
+        stats = {}
+
+        if self.augmix:
+            logits, logits_aug0, logits_aug1 = torch.split(logits, len(logits) // 3)
+            loss_js = js_divergence(logits, logits_aug0, logits_aug1) * self.augmix_alpha * self.beta
+            stats["loss_augmix"] = loss_js
+
+        loss_cls = F.cross_entropy(logits, y) * (1 - self.kd_mixture)
+        stats["cross_entropy_loss"] = loss_cls
+        stats["acc"] = accuracy(torch.argmax(logits, 1), y)
+        stats["loss_kd"] = loss_kd
+
+        return loss_cls + loss_kd, stats
+
+
+class AugmixKnowledgeDistill(KnowledgeDistill):
+    def __init__(
+            self,
+            network: nn.Module,
+            teacher: Teacher,
+            kd_T: float = 4.0,
+            kd_mixture: float = 0.5,
+            only_smooth: bool = 0.5,
+            augmix_alpha: float = 6.0,
+            **kwargs,
+    ):
+        super(AugmixKnowledgeDistill, self).__init__(network, teacher, kd_T, kd_mixture, only_smooth)
+        self.augmix_alpha = augmix_alpha  # scaling for the augmix loss
+
+    def forward(self, batch):
+        idx, x, y = batch
+
+        comb_x = torch.cat(x)
+
+        student_logits = self.network(comb_x)
+        with torch.no_grad():
+            teacher_logits = self.teacher(idx, comb_x)
+
+        loss_kd = self.kd_mixture * self.kd_loss(student_logits, teacher_logits, y)
+        logits = torch.split(student_logits, student_logits.shape[0] // 3)
+
+        loss_js = js_divergence(*logits) * self.augmix_alpha
+
+        loss = (1 - self.kd_mixture) * F.cross_entropy(logits[0], y)
+        acc = accuracy(torch.argmax(logits[0], 1), y)
+        loss_cls = loss * (1 - self.kd_mixture) + loss_js
+
         stats = {
-            "teacher_acc": teacher_acc,
             "acc": acc,
-            "kl_loss": loss,
+            "cross_entropy_loss": loss,
+            "augmix_loss": loss_js,
             "KD_loss": loss_kd,
         }
-        return loss + loss_kd, stats
 
+        return loss_cls + loss_kd, stats
+
+
+class ActivationCollector(UserDict):
+    """ Collects activations from forward passes."""
+
+    def __init__(self, modules: Dict, mode="out"):
+        super(ActivationCollector, self).__init__()
+        assert mode in ["out", "in"]
+        self.modules = modules
+        self.mode = mode
+        self.prepare()
+
+    def ensure_hook(self, name: str, module: nn.Module):
+        """ Ensures that there are hooks in a module."""
+
+        def save_activation(module, inputs, outputs):
+            if self.mode == "in":
+                self.data[name] = inputs[0]
+                return
+            if isinstance(outputs, tuple):
+                # This can be removed when we only
+                # use the hooks to get activations from models.
+                # if we delete the is_feat part.
+                outputs = outputs[0]
+            self.data[name] = outputs
+
+        # Check whether the module was already registered.
+        if hasattr(module, "__activation_hook"):
+            return
+
+        module.register_forward_hook(save_activation)
+        module.__activation_hook = None
+
+    def prepare(self):
+        for name, module in self.modules.items():
+            self.ensure_hook(name, module)
+
+    def reset(self):
+        self.data = {}
 
 
 class AttentionDistill(nn.Module):
     def __init__(
-        self,
-        network: nn.Module,
-        teacher: Teacher,
-        kd_T: float = 4.0,
-        p: float = 1.0,
-        beta: float = 2.0,
-        **kwargs,
+            self,
+            network: nn.Module,
+            teacher: Teacher,
+            p: float = 1.0,
+            beta: float = 2.0,
+            augmix: bool = False,
+            augmix_alpha: float = 12,
+            **kwargs,
     ):
         super(AttentionDistill, self).__init__()
         self.network = network
-        self.teacher_activations = {}
-        self.student_activations = {}
         self.teacher = teacher
-        self.beta = beta 
+        # at_entry_points returns the modules that should be used for
+        # Attention distillation.
+        self.student_collector = ActivationCollector(at_entry_points(network))
+        self.teacher_collector = ActivationCollector(at_entry_points(teacher))
+        self.beta = beta
         self.p = p
-
-        # teacher_entries = [name for name, _ in self.target_modules(True)]
-        # student_entries = [name for name, _ in self.target_modules(True)]
-
-        # logger.debug("Teacher attention maps are build from: ")
+        self.augmix = augmix
+        self.augmix_alpha = augmix_alpha
 
     def attention_map(self, features):
         """ Adopted from the RepDistiller repository."""
@@ -143,66 +301,45 @@ class AttentionDistill(nn.Module):
 
         return torch.norm(student_attention - teacher_attention, 2, dim=1).mean() / 2
 
-    def ensure_hook(self, module_name: str, module: nn.Module, is_teacher: bool):
-        """ Ensures that there are hooks in a module."""
-
-        def save_activation(module, inputs, outputs):
-            if isinstance(outputs, tuple):
-                # This can be removed when we only 
-                # use the hooks to get activations from models.
-                outputs = outputs[0]
-            if is_teacher:
-                self.teacher_activations[module_name] = outputs
-            else:
-                self.student_activations[module_name] = outputs
-
-        # Check wether the module was already registered.
-        if hasattr(module, "__activation_hook"):
-            return
-        module.register_forward_hook(save_activation)
-        module.__activation_hook = None
-
-    def target_modules(self, is_teacher: bool):
-        # This currently works only for resnet architectures.
-        selector = re.compile(r"[a-z0-9\.]*layer[0-9]+")
-        network = self.teacher if is_teacher else self.network
-
-        for name, module in network.named_modules():
-            if selector.fullmatch(name) is None:
-                continue
-            yield name.split(".")[-1], module
-
-    def prepare_activations(self):
-        if isinstance(self.teacher, DatabaseNetwork):
-            raise NotImplementedError
-
-        # Register hooks.
-        for is_teacher in [False, True]: 
-            for module_name, module in self.target_modules(is_teacher):
-                self.ensure_hook(module_name, module, is_teacher)
-
     def forward(self, batch):
         idx, x, y = batch
-        self.prepare_activations()
         stats = {}
-        
+
+        if self.augmix:
+            x = torch.cat(x)
+
         # Teacher forward pass.
         with torch.no_grad():
             self.teacher(idx, x)
 
-        # Calculate normal loss
-        logits = self.network(x)
+        # Studend forward pass.
+        if self.augmix:
+            logits = self.network(x)
+            logits, logits_aug1, logits_aug2 = torch.split(logits, len(logits) // 3)
+        else:
+            logits = self.network(x)
+
+        # Calculate the cross entropy loss.
         loss = F.cross_entropy(logits, y)
         stats["cross_entropy_loss"] = loss
         stats["acc"] = accuracy(torch.argmax(logits, 1), y)
 
         # Calculate attention map losses.
         at_losses = []
-        for module_name in self.student_activations:
-            at_loss = self.attention_distance(
-                self.student_activations[module_name],
-                self.teacher_activations[module_name],
-            )
+
+        assert len(self.student_collector)
+        for module_name in self.student_collector:
+            activation_student = self.student_collector[module_name]
+            activation_teacher = self.teacher_collector[module_name]
+
+            if self.augmix:
+                # Average the activations.
+                n_s = len(activation_student) // 3
+                activation_student = sum(torch.split(activation_student, n_s)) / 3
+                n_t = len(activation_teacher) // 3
+                activation_teacher = sum(torch.split(activation_teacher, n_t)) / 3
+
+            at_loss = self.attention_distance(activation_student, activation_teacher)
             stats["loss_AT_" + module_name] = at_loss
             at_losses.append(at_loss)
 
@@ -210,292 +347,90 @@ class AttentionDistill(nn.Module):
         stats["loss_AT"] = at_loss
 
         # Reset everything to delete the graphs (student).
-        self.student_activations = {}
-        self.teacher_activations = {}
+        self.teacher_collector.reset()
+        self.student_collector.reset()
+
+        if self.augmix:
+            augmix_loss = self.augmix_alpha * js_divergence(logits, logits_aug1, logits_aug2)
+            stats["loss_augmix"] = augmix_loss
+            return loss + at_loss + augmix_loss, stats
 
         return loss + at_loss, stats
 
 
-class AugmixKnowledgeDistill(nn.Module):
-    def __init__(
-        self,
-        network: nn.Module,
-        teacher: Teacher,
-        kd_T: float = 4.0,
-        charlie: float = 0.5,
-        alpha: float = 12.0,
-        beta: float = 0.5,
-        **kwargs,
-    ):
-        """Implements the AugmixLoss from the augmix paper.
-
-        Args:
-            alpha: Multiplitave factor for the jensen-shannon divergence.
-        """
-        super(AugmixKnowledgeDistill, self).__init__()
+class ContrastiveDistill(nn.Module):
+    def __init__(self, network: nn.Module, datamodule, teacher: Teacher,
+                 kd_T: float = 4., augmix: bool = False, augmix_alpha: float = 12.,
+                 beta: float = 0.1,
+                 gamma: float = 0.1,
+                 charlie: float = 0.1, delta: float = 0.8,
+                 feat_dim: int = 128, nce_k: int = 16384,
+                 nce_t: int = 0.07, nce_m: int = 0.5, **kwargs):
+        super(ContrastiveDistill, self).__init__()
         self.network = network
-        self.alpha = alpha  # scaling for the augmix loss
-        self.beta = beta  # scaling for the classification loss
+        self.datamodule = datamodule
         self.teacher = teacher
         self.kd_T = kd_T  # temperature for KD
+        self.augmix = augmix
+        self.augmix_alpha = augmix_alpha  # scaling for the augmix loss
+        self.gamma = gamma  # scaling for the classification loss
+        self.beta = beta
         self.charlie = charlie  # scaling for the KD loss
+        self.delta = delta  # scaling for the CRD loss
+        self.feat_dim = feat_dim  # the dimension of the projection space
 
-    def forward(self, batch):
-        idx, x, y = batch
-
-        comb_x = torch.cat(x)
-
-        self.teacher.eval()
-        criterion_dv = DistillKL(self.kd_T)
-
-        kd_logits = self.network(comb_x)
-        with torch.no_grad():
-            teacher_logits = self.teacher(idx, comb_x)
-
-        loss_kd = criterion_dv(kd_logits, teacher_logits) * self.charlie
-        logits = torch.split(kd_logits, kd_logits.shape[0] // 3)
-
-        p_clean, p_aug1, p_aug2 = (
-            F.softmax(logits[0], dim=1),
-            F.softmax(logits[1], dim=1),
-            F.softmax(logits[2], dim=1),
-        )
-
-        # Clamp mixture distribution to avoid exploding KL divergence
-        p_mixture = torch.clamp((p_clean + p_aug1 + p_aug2) / 3.0, 1e-7, 1).log()
-
-        loss_js = (
-            F.kl_div(p_mixture, p_clean, reduction="batchmean")
-            + F.kl_div(p_mixture, p_aug1, reduction="batchmean")
-            + F.kl_div(p_mixture, p_aug2, reduction="batchmean")
-        ) / 3.0
-        loss_js *= self.alpha
-
-        loss = F.cross_entropy(logits[0], y)
-        acc = accuracy(torch.argmax(logits[0], 1), y)
-        loss_cls = (loss + loss_js) * self.beta
-
-        stats = {
-            "acc": acc,
-            "kl_loss": loss,
-            "augmix_loss": loss_js,
-            "KD_loss": loss_kd,
-        }
-
-        return loss_cls + loss_kd, stats
-
-
-class AugmixLoss(nn.Module):
-    def __init__(
-        self,
-        network: nn.Module,
-        alpha: float = 12.0,
-        beta: float = 1.0,
-        soft_target: bool = False,
-        **kwargs,
-    ):
-        """Implements the AugmixLoss from the augmix paper.
-
-        Args:
-            alpha: Multiplitave factor for the jensen-shannon divergence.
-        """
-        super(AugmixLoss, self).__init__()
-        self.network = network
-        self.alpha = alpha
-        self.beta = beta
-
-        self.soft_target = soft_target
-        if soft_target:
-            raise NotImplementedError
-
-    def forward(self, batch):
-        idx, x, y = batch
-
-        logits = self.network(torch.cat(x))
-        logits = torch.split(logits, logits.shape[0] // 3)
-
-        p_clean, p_aug1, p_aug2 = (
-            F.softmax(logits[0], dim=1),
-            F.softmax(logits[1], dim=1),
-            F.softmax(logits[2], dim=1),
-        )
-
-        # Clamp mixture distribution to avoid exploding KL divergence
-        p_mixture = torch.clamp((p_clean + p_aug1 + p_aug2) / 3.0, 1e-7, 1).log()
-
-        loss_js = (
-            F.kl_div(p_mixture, p_clean, reduction="batchmean")
-            + F.kl_div(p_mixture, p_aug1, reduction="batchmean")
-            + F.kl_div(p_mixture, p_aug2, reduction="batchmean")
-        ) / 3.0
-        loss_js *= self.alpha
-
-        loss = self.beta * F.cross_entropy(logits[0], y)
-        acc = accuracy(torch.argmax(logits[0], 1), y)
-
-        stats = {"acc": acc, "kl_loss": loss, "augmix_loss": loss_js}
-
-        return loss + loss_js, stats
-
-
-class CRD_Loss(nn.Module):
-    def __init__(self, network: nn.Module, datamodule, teacher:Teacher, teacher_path,
-        teacher_model_id, kd_T: float = 4.,
-        gamma:float = 0.1, charlie:float = 0.1,
-        delta: float = 0.8, feat_dim: int=128,
-        nce_k:int= 16384, nce_t:int=0.07, nce_m:int= 0.5,
-        percent:float=1.0, mode:str='exact', k=4096,
-        s_dim=None, t_dim=None, n_data=None, **kwargs):
-
-        super(CRD_Loss, self).__init__()
-        self.network = network
-        self.datamodule = datamodule
-        # You can access the dataset by using:
-        # self.datamodule.train_dataset[0] -> idx, x, y    or for augmix idx, (x, x1, x2), y
-        self.teacher = teacher
-        #self.teacher_network = create_network(teacher_model_id, ckpt_path=teacher_path)
-        self.kd_T = kd_T 	 	#temperature for KD
-        self.gamma = gamma 	 	#scaling for the classification loss
-        self.charlie = charlie  	#scaling for the KD loss
-        self.delta = delta  		#scaling for the CRD loss
-        self.feat_dim = feat_dim	#the dimension of the projection space
-        self.nce_k = nce_k		#number of negatives paired with each positive
-        self.nce_t = nce_t		#the temperature
-        self.nce_m = nce_m		#the momentum for updating the memory buffer
-        self.feat_dim = feat_dim
-        self.percent = percent
-        self.mode = mode
-        self.k=k
-        self.s_dim = s_dim
-        self.t_dim = t_dim
-        self.n_data = n_data
+        s_dim = classifier(network).weight.shape[1]
+        t_dim = classifier(teacher).weight.shape[1]
+        n_data = 50000  # len(self.datamodule.train_dataset)
         self.criterion_kd = CRDLoss([s_dim, t_dim, n_data, feat_dim, nce_k, nce_t, nce_m])
+        self.student_collector = ActivationCollector({"classifier": classifier(network)}, mode="in")
+        self.teacher_collector = ActivationCollector({"classifier": classifier(teacher)}, mode="in")
 
-    def forward(self, network: nn.Module, batch):
-        idx, x, y, contrast_idx = batch
-        preact = False
-        num_classes = 100
-        
-
-        self.network.is_feat = True
-        self.teacher.network.is_feat = True       
-
-        criterion_dv = DistillKL(self.kd_T)
-
-
-        self.network.train()
-        feat_s, logit_s = self.network(x)
-        self.network.is_feat = False
-        with torch.no_grad():
-            self.teacher.is_feat = True
-            feat_t, logit_t = self.teacher(idx, x)
-        f_s = feat_s[-1]
-        f_s = f_s[0:64]
-        f_t = feat_t[-1]
-        f_t = f_t[0:64]
-
-        loss_crd = self.criterion_kd(f_s, f_t, idx, contrast_idx) * self.delta
-        loss = F.cross_entropy(logits, y) * self.gamma
-        loss_kd = criterion_dv(logits, teacher_logits) * self.charlie
-        acc = accuracy(torch.argmax(logits, 1), y)
-        stats = {"acc": acc, "kl_loss": loss, "KD_loss": loss_kd, "CRD_loss": loss_crd}
-
-        return loss+loss_kd+loss_crd , stats
-
-class Augmix_CRD_Loss(nn.Module):
-    def __init__(self, network: nn.Module, datamodule, teacher:Teacher, teacher_path, teacher_model_id,
-        kd_T: float = 4., alpha:float=12., beta:float = 0.1, gamma:float = 0.1,
-        charlie:float = 0.1, delta: float = 0.8,
-        feat_dim: int=128, nce_k:int= 16384,
-        nce_t:int=0.07, nce_m:int= 0.5,
-        percent:float=1.0, mode:str='exact', k=4096,
-        s_dim=None, t_dim=None, n_data=None, **kwargs):
-
-        super(Augmix_CRD_Loss, self).__init__()
-        #self.teacher_network = create_network(teacher_model_id, ckpt_path=teacher_path)
-        self.network = network
-        self.datamodule = datamodule
-        self.teacher=teacher
-        self.kd_T = kd_T 	 	#temperature for KD
-        self.alpha = alpha		#scaling for the augmix loss
-        self.beta = beta
-        self.gamma = gamma 	 	#scaling for the classification loss
-        self.charlie = charlie  	#scaling for the KD loss
-        self.delta = delta  		#scaling for the CRD loss
-        self.feat_dim = feat_dim	#the dimension of the projection space
-        self.nce_k = nce_k		#number of negatives paired with each positive
-        self.nce_t = nce_t		#the temperature
-        self.nce_m = nce_m		#the momentum for updating the memory buffer
-        self.percent = percent
-        self.mode = mode
-        self.k=k
-        self.s_dim = s_dim
-        self.t_dim = t_dim
-        self.n_data = 50000
-        self.criterion_kd = CRDLoss([s_dim, t_dim, n_data, feat_dim, nce_k, nce_t, nce_m])
-    
     def forward(self, batch):
         idx, x, y, contrast_idx = batch
-        preact = False
-        num_classes = 100
-        
 
-        self.network.is_feat = True
-        self.teacher.network.is_feat = True       
-
-        comb_x = torch.cat(x)
+        if self.augmix:
+            x = torch.cat(x)
 
         criterion_dv = DistillKL(self.kd_T)
 
-
         self.network.train()
-        feat_s, logit_s = self.network(comb_x)
-        self.network.is_feat = False
+        logits_student = self.network(x)
+
         with torch.no_grad():
-            #feat_t, logit_t = self.teacher_network(idx, comb_x, is_feat=True, preact=preact)
             self.teacher.eval()
-            self.teacher.is_feat = True
-            feat_t, logit_t = self.teacher(idx, comb_x)
-            #device = feat_t[0].device
-            #feat_t = [f.detach() for f in feat_t]
-        f_s = feat_s[-1]
-        f_s = f_s[0:64]
-        f_t = feat_t[-1]
-        f_t = f_t[0:64]
+            logits_teacher = self.teacher(idx, x)
+
+        # Changed that
+        f_s = self.student_collector["classifier"]
+        f_t = self.teacher_collector["classifier"]
+
+        # TODO (Shashank): Is this the best way? Or should we average.
+        if self.augmix:
+            f_s = f_s[0: len(f_s) // 3]
+            f_t = f_t[0: len(f_t) // 3]
+
+        stats = {}
 
         loss_crd = self.criterion_kd(f_s, f_t, idx, contrast_idx) * self.delta
+        stats["loss_crd"] = loss_crd
 
-        loss_kd = criterion_dv(logit_s, logit_t) * self.charlie
+        loss_kd = criterion_dv(logits_student, logits_teacher) * self.charlie
+        stats["loss_kd"] = loss_kd
 
-        logits = torch.split(logit_s, logit_s.shape[0] // 3)
+        # TODO (Shashank): Remove beta later on.
+        if self.augmix:
+            logits, logits_aug1, logits_aug2 = torch.split(logits_student, logits_student.shape[0] // 3)
+            loss_js = self.augmix_alpha * js_divergence(logits, logits_aug1, logits_aug2) * self.beta
+            stats["loss_augmix"] = loss_js
+        else:
+            logits = logits_student
 
-        p_clean, p_aug1, p_aug2 = (
-            F.softmax(logits[0], dim=1),
-            F.softmax(logits[1], dim=1),
-            F.softmax(logits[2], dim=1),
-        )
+        loss_cls = F.cross_entropy(logits, y)
+        stats["cross_entropy_loss"] = loss_cls
+        stats["acc"] = accuracy(torch.argmax(logits, 1), y)
 
-        # Clamp mixture distribution to avoid exploding KL divergence
-        p_mixture = torch.clamp((p_clean + p_aug1 + p_aug2) / 3.0, 1e-7, 1).log()
-
-        loss_js = (
-            F.kl_div(p_mixture, p_clean, reduction="batchmean")
-            + F.kl_div(p_mixture, p_aug1, reduction="batchmean")
-            + F.kl_div(p_mixture, p_aug2, reduction="batchmean")
-        ) / 3.0
-        loss_js *= self.alpha
-
-        loss = F.cross_entropy(logits[0], y)
-        acc = accuracy(torch.argmax(logits[0], 1), y)
-        loss_cls = (loss + loss_js) * self.beta
-
-        stats = {
-            "acc": acc,
-            "kl_loss": loss,
-            "augmix_loss": loss_js,
-            "KD_loss": loss_kd,
-            "CRD_loss": loss_crd,
-        }
+        if self.augmix:
+            return loss_cls + loss_kd + loss_crd + loss_js, stats
 
         return loss_cls + loss_kd + loss_crd, stats
-
