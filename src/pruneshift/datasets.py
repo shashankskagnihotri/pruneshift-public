@@ -121,25 +121,33 @@ class TransformWrapper(Dataset):
 
 
 class CRDWrapper(Dataset):
-    def __init__(self, dataset, transform, with_idx=False):
+    def __init__(self, dataset, transform, with_idx=False, deep_augment=True):
         self.dataset = dataset
         self.transform = transform
         self.with_idx = with_idx
         self.k = 16384
         self.percent = 1.0
         self.mode = 'exact'
+        self.deep_augment = deep_augment
         
         
         current_dataset = dataset
         while hasattr(current_dataset, 'dataset'):
             current_dataset = current_dataset.dataset
-        label = current_dataset.targets
-        num_classes = len(set(label))
-        num_samples = len(dataset)
-        
+
+        if self.deep_augment:
+            # When using the deep_augment dataset with three
+            # times the same dataset but differently augmented.
+            labels = current_dataset.datasets[0].targets
+        else:
+            labels = current_dataset.targets
+
+        num_classes = len(set(labels))
+        num_samples = len(labels)
+
         self.cls_positive = [[] for i in range(num_classes)]
         for i in range(num_samples):
-            self.cls_positive[label[i]].append(i)
+            self.cls_positive[labels[i]].append(i)
 
         self.cls_negative = [[] for i in range(num_classes)]
         for i in range(num_classes):
@@ -162,6 +170,9 @@ class CRDWrapper(Dataset):
     def __getitem__(self, idx):
         x, y = self.dataset[idx]
         target = y
+
+        if self.deep_augment:
+            idx %= len(self) // 3
         
         if self.mode == 'exact':
             pos_idx = idx
@@ -183,6 +194,7 @@ class CRDWrapper(Dataset):
 
     def __len__(self):
         return len(self.dataset)
+
 
 class ExternalDataset(Dataset):
     dir_name: str = None

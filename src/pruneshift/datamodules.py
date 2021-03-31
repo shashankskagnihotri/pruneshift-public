@@ -243,10 +243,12 @@ class ShiftDataModule(pl.LightningDataModule):
             val_dataset = self.create_dataset(False)
 
             # 4. Add standard augmentation or augmix to the training set.
+            deep_augment = False if self.deepaugment_path is None else True
+
             if not self.augmix:
                 comb = compose(self.train_transform, self.normalize)
                 if self.crd:
-                    train_dataset = CRDWrapper(train_dataset, comb, with_idx = True)
+                    train_dataset = CRDWrapper(train_dataset, comb, with_idx=True, deep_augment=deep_augment)
                 else:
                     train_dataset = TransformWrapper(train_dataset, comb, with_idx=True)
             else:
@@ -255,7 +257,7 @@ class ShiftDataModule(pl.LightningDataModule):
                 train_dataset = AugMixWrapper(train_dataset, self.normalize, no_jsd)
                 # Add indices to the samples.
                 if self.crd:
-                    train_dataset = CRDWrapper(train_dataset, None, with_idx=True)
+                    train_dataset = CRDWrapper(train_dataset, None, with_idx=True, deep_augment=deep_augment)
                 else:
                     train_dataset = TransformWrapper(train_dataset, None, with_idx=True)
 
@@ -301,7 +303,7 @@ class ShiftDataModule(pl.LightningDataModule):
             num_workers=self.num_workers,
             pin_memory=True,
             shuffle=train,
-            drop_last = train,
+            drop_last=train,
         )
 
     def train_dataloader(self):

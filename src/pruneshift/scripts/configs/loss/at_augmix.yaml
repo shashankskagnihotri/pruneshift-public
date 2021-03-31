@@ -1,0 +1,12 @@
+# @package _global_
+
+loss:
+  _target_: pruneshift.losses.AttentionDistill
+  kd_T: 4.
+  p: 1.0
+  beta: 50.
+  augmix: True
+  augmix_alpha: 12
+
+datamodule:
+  augmix: True

@@ -382,7 +382,7 @@ class ContrastiveDistill(nn.Module):
 
         s_dim = classifier(network).weight.shape[1]
         t_dim = classifier(teacher).weight.shape[1]
-        n_data = 50000  # len(self.datamodule.train_dataset)
+        n_data = datamodule.train_length()
         self.criterion_kd = CRDLoss([s_dim, t_dim, n_data, feat_dim, nce_k, nce_t, nce_m])
         self.student_collector = ActivationCollector({"classifier": classifier(network)}, mode="in")
         self.teacher_collector = ActivationCollector({"classifier": classifier(teacher)}, mode="in")
