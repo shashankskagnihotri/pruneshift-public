@@ -1,11 +1,4 @@
-"""Provides network topologies for CIFAR and ImageNet datasets.
-
-Note, that we did not find any pretrained models for Cifar10 and Cifar100:
-
-Thus, they must be manually trained and provided in a checkpoint directory.
-The checkpoints must have the following form:
-    {network_id}.{version}
-"""
+""" Bundles different kind of network create functions."""
 from functools import partial
 import re
 from pathlib import Path
@@ -24,6 +17,7 @@ import pytorch_lightning as pl
 from .utils import safe_ckpt_load
 import cifar10_models as cifar_models
 import pytorch_resnet_cifar10.resnet as cifar_resnet
+import scalable_resnet
 import models as models
 
 
@@ -31,10 +25,6 @@ logger = logging.getLogger(__name__)
 
 # Bugfix otherwise eval mode does not work for mnasnet architectures.
 mnasnet._BN_MOMENTUM = 0.1
-
-# NETWORK_REGEX = re.compile(
-#     r"(?P<group>[a-zA-Z]+)(?P<num_classes>[0-9]+)_(?P<name>[a-zA-Z0-9_]+)"
-# )
 
 
 def protect_classifier(name: str, network: nn.Module):
@@ -55,7 +45,6 @@ def protect_classifier(name: str, network: nn.Module):
         raise NotImplementedError
 
 
-
 def create_network(
     group: str,
     name: str,
@@ -65,7 +54,9 @@ def create_network(
     version: int = None,
     protect_classifier_fn: Optional[Callable] = None,
     download: bool = False,
-    imagenet_subset: Optional[bool] = None,
+    imagenet_subset_path: str = None,
+    imagenet_path: str = None,
+    scaling_factor: float = 1.0,
     **kwargs,
 ):
     """A function creating networks.
@@ -82,14 +73,18 @@ def create_network(
             protectionfrom pruning.
         download: Whether to download a model from torchvision. Only
             possible for imagenet1000.
-        imagenet_subset: Whether the model should adjust activations for
-            different ordered imagenet subsets. Note that when using a
-            downloaded model, with fewer classes, this is done automati-
-            cally.
+        imagenet_subset_path: When given we wrap networks that were
+            trained on imagenet1000, to match the correct logits for
+            the subset. Should point to the training folder.
+        imagenet_path: The path to imagenet1000, must be passed with
+            imagenet_subset_path.
+        scaling_factor: float
 
     Returns:
         The desired network.
     """
+    assert imagenet_path is None == imagenet_subset_path is None
+
     logger.info(f"Creating network {name} for {group} with {num_classes} classes.")
 
     # 2. Find the right factory function for the network.
@@ -104,7 +99,12 @@ def create_network(
             network_fn = getattr(models, name)
     elif group == "imagenet":
         if hasattr(imagenet_models, name):
-            network_fn = getattr(imagenet_models, name)
+            if scaling_factor != 1.0:
+                logger.info(f"Scaling the network {scaling_factor} times.")
+                network_fn = getattr(scalable_resnet, name)
+                network_fn = partial(network_fn, scaling_factor=scaling_factor)
+            else:
+                network_fn = getattr(imagenet_models, name)
         else:
             # Look at pytorch-image-models
             network_fn = partial(timm.create_model, model_name=name)
@@ -115,16 +115,9 @@ def create_network(
     if download:
         kwargs["pretrained"] = True
 
-    subset_wrap = imagenet_subset
     create_num_classes = num_classes
 
-    if (
-        download
-        and group == "imagenet"
-        and num_classes != 1000
-        and imagenet_subset is None
-        or imagenet_subset
-    ):
+    if imagenet_path is not None:
         subset_wrap = True
         create_num_classes = 1000
 
@@ -141,7 +134,9 @@ def create_network(
     # When downloaded we change the label scheme from the activations..
     if subset_wrap:
         logger.info(f"Adopting network from imagenet1000 to imagenet{num_classes}.")
-        network = ImagenetSubsetWrapper(network, num_classes)
+        network = ImagenetSubsetWrapper(
+            network, num_classes, imagenet_subset_path, imagenet_path
+        )
 
     # Add a reset hook for lottery style pruning.
     add_reset_hook(
@@ -160,15 +155,10 @@ class ImagenetSubsetWrapper(nn.Module):
         self,
         network: nn.Module,
         num_classes: int,
-        root: str = None,
-        super_root: str = None,
+        root: str,
+        super_root: str,
     ):
         super(ImagenetSubsetWrapper, self).__init__()
-        # TODO: Finally make this parameterizable.
-        # root = f"/misc/scratchSSD2/datasets/ILSVRC2012-{num_classes}/train"
-        # super_root = "/misc/scratchSSD2/datasets/ILSVRC2012/train"
-        super_root = "/data/datasets/ILSVRC2012/train"
-        root = f"/work/dlclarge2/hoffmaja-pruneshift/datasets/ILSVRC2012-{num_classes}/train"
         self.num_classes = num_classes
         self.root = root
         self.super_root = super_root

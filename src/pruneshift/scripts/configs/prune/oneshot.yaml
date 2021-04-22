@@ -1,0 +1,6 @@
+# @package _global_
+
+prune:
+    method: global_weight
+    amount: 0.5
+

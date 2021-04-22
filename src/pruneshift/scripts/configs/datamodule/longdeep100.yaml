@@ -14,7 +14,7 @@ network:
     group: imagenet
 
 scheduler:
-    _target_: pruneshift.modules.MultiStepWarmUpLr
+    _target_: pruneshift.modules.multi_step_warm_up_lr
     warmup_end: 5 
     milestones: [20, 40, 53]
 

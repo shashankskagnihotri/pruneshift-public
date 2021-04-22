@@ -3,8 +3,9 @@ from functools import partial
 import logging
 from typing import Sequence
 from typing import Callable
+from typing import Optional
 import re
-
+import math
 
 import pytorch_lightning as pl
 from pytorch_lightning.metrics import Accuracy
@@ -22,22 +23,32 @@ logger = logging.getLogger(__name__)
 CORRUPTION_REGEX = re.compile(r"test_acc_[a-z_]+_[0-9]")
 
 
-class MultiStepWarmUpLr(LambdaLR):
-    def __init__(
-        self,
-        optimizer,
-        milestones: Sequence[int],
-        warmup_end: int = 0,
-        gamma: float = 0.1,
-    ):
-        """Learning rate scheduler that supports a warmup period with milestones."""
+def multi_step_warm_up_lr(
+    epoch: int,
+    milestones: Sequence[int] = (20, 50, 70),
+    warmup_end: int = 0,
+    gamma: float = 0.1,
+):
+    """ Learning rate schedule that supports a warmup period with milestones."""
+    if epoch < warmup_end:
+        return (epoch + 1) / warmup_end
+    return gamma ** bisect_right(milestones, epoch)
 
-        def lr_schedule(epoch):
-            if epoch < warmup_end:
-                return (epoch + 1) / warmup_end
-            return gamma ** bisect_right(milestones, epoch)
 
-        super(MultiStepWarmUpLr, self).__init__(optimizer, lr_schedule)
+def cosine_lr(
+    epoch: int,
+    T_max: int,
+    eta_min: float = 0,
+):
+    """ Cosine learning rate schedule."""
+    if eta_min != 0:
+        raise NotImplementedError
+    return (1 + math.cos(math.pi * epoch / T_max)) / 2
+
+
+def repeat_lr(epoch: int, scheduler_fn, cycle_length: int):
+    epoch %= cycle_length
+    return scheduler_fn(epoch)
 
 
 class VisionModule(pl.LightningModule):
@@ -55,7 +66,7 @@ class VisionModule(pl.LightningModule):
         super(VisionModule, self).__init__()
         self.network = network
         self.train_loss = StandardLoss(network) if train_loss is None else train_loss
-        self.datamodule = datamodule 
+        self.datamodule = datamodule
         self.val_loss = StandardLoss(network)
         self.optimizer_fn = optimizer_fn
         self.scheduler_fn = scheduler_fn
@@ -63,11 +74,6 @@ class VisionModule(pl.LightningModule):
         # Prepare the metrics.
         self.test_labels = [f"acc_{l}" for l in self.datamodule.labels]
         self.test_acc = nn.ModuleDict({l: Accuracy() for l in self.test_labels})
-
-    def on_train_start(self):
-        # This introduces a bug!!!
-        # self.model_stats()
-        return
 
     # @rank_zero_only
     def model_stats(self):
@@ -86,7 +92,7 @@ class VisionModule(pl.LightningModule):
         # versions.
         return self.network.state_dict(*args, **kwargs)
 
-    def training_step(self, batch, batch_idx):        
+    def training_step(self, batch, batch_idx):
         loss, stats = self.train_loss(batch)
         self.log("train_loss", loss, on_step=False, on_epoch=True, sync_dist=True)
 
@@ -114,10 +120,7 @@ class VisionModule(pl.LightningModule):
 
     def test_step(self, batch, batch_idx, dataset_idx=0):
         _, x, y = batch
-        #print(x)
-        self.test_acc[self.test_labels[dataset_idx]](
-            y, torch.argmax(self(x), -1)
-        )
+        self.test_acc[self.test_labels[dataset_idx]](y, torch.argmax(self(x), -1))
 
     def test_epoch_end(self, outputs):
         values = {}
@@ -143,7 +146,7 @@ class VisionModule(pl.LightningModule):
         if self.scheduler_fn is None:
             return optimizer
 
-        scheduler = {"scheduler": self.scheduler_fn(optimizer)}
+        scheduler = {"scheduler": LambdaLR(optimizer, self.scheduler_fn)}
 
         # if self.monitor is not None:
         #     scheduler["monitor"] = self.monitor
@@ -157,10 +160,20 @@ class PrunedModule(VisionModule):
         network: nn.Module,
         prune_fn: Callable,
         datamodule,
+        prune_at_start: bool = True,
+        rewind_max_epochs: Optional[int] = None,
+        prune_interval: Optional[int] = None,
         train_loss: nn.Module = None,
         optimizer_fn=optim.Adam,
         scheduler_fn=None,
     ):
+        if rewind_max_epochs is not None and scheduler_fn is not None:
+            scheduler_fn = partial(
+                repeat_lr,
+                scheduler_fn=scheduler_fn,
+                cycle_length=rewind_max_epochs,
+            )
+
         super(PrunedModule, self).__init__(
             network=network,
             datamodule=datamodule,
@@ -170,21 +183,21 @@ class PrunedModule(VisionModule):
         )
 
         self.prune_fn = prune_fn
+        self.prune_interval = prune_interval
+        self.prune_at_start = prune_at_start
 
-    def setup(self, stage: str):
-        # Prune only at the beginning of the training phase.
-        if stage == "fit":
-            info = self.prune_fn(self.network)
-            self.print(f"\n {info.summary()}")
-            self.print("The effective compression ratio is {}".format(info.network_comp()))
-            self.print("The effective num of params is {}".format(info.network_size()))
+    def prune(self):
+        info = self.prune_fn(self.network)
+        self.print(f"\n {info.summary()}")
+        self.print("The effective compression ratio is {}".format(info.network_comp()))
+        self.print("The effective num of params is {}".format(info.network_size()))
 
+    def on_train_epoch_start(self):
+        # Prune at start if wanted.
+        if self.trainer.current_epoch == 0 and self.prune_at_start:
+            self.prune()
 
-    # def on_train_epoch_start(self):
-    #     if self.trainer.current_epoch == self.T_prune_end:
-    #         dehydrate(self.network)
-
-    #         optimizers, lr_schedulers = self.configure_optimizers()
-    #         self.trainer.optimizers = optimizers
-    #         self.trainer.lr_schedulers = lr_schedulers
-
+        # Prune when prune_interval is given.
+        if self.prune_interval is not None and self.trainer.current_epoch > 0:
+            if self.trainer.current_epoch % self.prune_interval == 0:
+                self.prune()

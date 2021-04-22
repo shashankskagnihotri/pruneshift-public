@@ -7,6 +7,7 @@ loss:
   kd_T: 4.
   kd_mixture: 0.9
   augmix: True
+  augmix_jensen: False
 
 datamodule:
   augmix: True

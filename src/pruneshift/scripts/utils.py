@@ -67,8 +67,15 @@ def create_trainer(cfg: DictConfig):
 
     pl.seed_everything(cfg.seed)
 
+    max_epochs = cfg.trainer.max_epochs
+
+    if "repeat" in cfg:
+        logger.info(f"Number of repeats: {cfg.repeat}")
+        max_epochs *= cfg.repeat
+
     trainer = instantiate(
         cfg.trainer,
+        max_epochs=max_epochs,
         logger=loggers,
         callbacks=callbacks,
         deterministic=deterministic,

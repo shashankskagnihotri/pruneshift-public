@@ -1,4 +1,5 @@
 defaults:
+    - hydra/launcher: submitit_slurm
     - path: standard
     - network: standard 
     - datamodule: cifar100

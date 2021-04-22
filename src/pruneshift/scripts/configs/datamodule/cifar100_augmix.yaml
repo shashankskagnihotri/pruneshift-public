@@ -16,6 +16,6 @@ trainer:
     max_epochs: 100
 
 scheduler:
-    _target_: torch.optim.lr_scheduler.CosineAnnealingLR
+    _target_: pruneshift.modules.cosine_lr
     T_max: ${trainer.max_epochs}
 

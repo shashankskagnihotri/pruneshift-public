@@ -20,6 +20,7 @@ from pruneshift.networks import protect_classifier
 logger = logging.getLogger(__name__)
 
 
+
 @hydra.main(config_path="configs", config_name="oneshot.yaml")
 def oneshot(cfg):
     """ Prunes a network and than finetunes it."""
@@ -33,12 +34,15 @@ def oneshot(cfg):
     scheduler_fn = partial_instantiate(cfg.scheduler)
     train_loss = create_loss(cfg, network, data)
 
+    module_kw = {} if "module" not in cfg else cfg.module
+    
     module = PrunedModule(network=network,
                           prune_fn=prune_fn,
                           datamodule=data,
                           optimizer_fn=optimizer_fn,
                           scheduler_fn=scheduler_fn,
-                          train_loss=train_loss)
+                          train_loss=train_loss,
+                          **module_kw)
 
     trainer.fit(module, datamodule=data)
     results = trainer.test(module, datamodule=data, verbose=False)

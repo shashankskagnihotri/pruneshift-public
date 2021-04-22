@@ -3,5 +3,6 @@
 name: swsl_resnet50 
 download: True
 num_classes: ${network.num_classes}
-group: imagenet 
-imagenet_subset: True
+group: imagenet
+imagenet_subset_path: ${datamodule.root}/train
+imagenet_path: ${path.imagenet1000}/train

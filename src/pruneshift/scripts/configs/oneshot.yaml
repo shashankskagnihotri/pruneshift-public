@@ -8,6 +8,7 @@ defaults:
     - teacher:
     - optimizer: sgd
     - datamodule: cifar100
+    - prune: oneshot
 
 prune:
     method: global_weight

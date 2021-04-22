@@ -1,0 +1,12 @@
+# @package _global_
+
+prune:
+    method: global_weight
+    amount: 0.2
+
+module:
+    prune_at_start: False
+    prune_interval: ${trainer.max_epochs}
+    rewind_max_epochs: ${trainer.max_epochs}
+
+repeat: 7

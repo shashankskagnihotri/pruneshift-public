@@ -1,16 +1,4 @@
 """ Implements losses and criterions."""
-
-# TODO: Rename everything.
-# TODO: 1. AT loss
-# TODO: 1.1.: Add augmix variant.
-# TODO: 1.2.: Outsource the hook stuff as a mixin (One part should recognize the targeted modules).
-#             Which will be needed by crd to be dynamically.
-# TODO: 1.3.: Double check everything.
-# TODO: 2. CRD loss
-# TODO: 2.1.: Add the hook mixin.
-# TODO: 2.2.: Update both variants.
-# TODO: 2.3.: Double check everything.
-# TODO: 2.4.: Do we need to compensate for pruning in the readout layer.
 import logging
 from typing import Dict
 from collections import UserDict
@@ -28,11 +16,6 @@ from pruneshift.network_markers import classifier
 
 logger = logging.getLogger(__name__)
 
-
-# What is missing?
-# AT augmix
-# AT supporting multiple architectures!
-# CRD supporting multiple architectures!
 
 
 def js_divergence(logits0, logits1, logits2):
@@ -110,6 +93,7 @@ class KnowledgeDistill(nn.Module):
             teacher: Teacher,
             augmix: bool = False,
             augmix_alpha: float = 12.,
+            augmix_jensen: bool = False,
             beta: float = 1,
             kd_T: float = 4.0,
             kd_mixture: float = 0.9,
@@ -123,6 +107,7 @@ class KnowledgeDistill(nn.Module):
         self.only_smooth = only_smooth
         self.augmix = augmix
         self.augmix_alpha = augmix_alpha
+        self.augmix_jensen = augmix_jensen 
         self.beta = beta
 
     def kd_loss(self, student_logits, teacher_logits, y):
@@ -164,6 +149,10 @@ class KnowledgeDistill(nn.Module):
 
         if self.augmix:
             logits, logits_aug0, logits_aug1 = torch.split(logits, len(logits) // 3)
+
+            if self.augmix_jensen:
+                _, _, logits_aug1 = torch.split(logits, len(logits) // 3)
+    
             loss_js = js_divergence(logits, logits_aug0, logits_aug1) * self.augmix_alpha * self.beta
             stats["loss_augmix"] = loss_js
 
@@ -399,6 +388,7 @@ class ContrastiveDistill(nn.Module):
         logits_student = self.network(x)
 
         with torch.no_grad():
+            # Is this correct?
             self.teacher.eval()
             logits_teacher = self.teacher(idx, x)
 
