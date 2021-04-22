@@ -83,7 +83,7 @@ def create_network(
     Returns:
         The desired network.
     """
-    assert imagenet_path is None == imagenet_subset_path is None
+    assert (imagenet_path is None) == (imagenet_subset_path is None)
 
     logger.info(f"Creating network {name} for {group} with {num_classes} classes.")
 
@@ -116,6 +116,7 @@ def create_network(
         kwargs["pretrained"] = True
 
     create_num_classes = num_classes
+    subset_wrap = False
 
     if imagenet_path is not None:
         subset_wrap = True

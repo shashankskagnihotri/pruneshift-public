@@ -1,5 +1,6 @@
 """Provides teachers for pruneshift."""
 import logging
+from typing import Optional
 
 import torch
 import torch.nn as nn
@@ -20,16 +21,19 @@ def create_teacher(
     model_path: str = None,
     version: int = None,
     download: bool = False,
-    imagenet_subset: bool = False,
+    imagenet_subset_path: Optional[str] = None,
+    imagenet_path: Optional[str] = None,
 ):
     """Creates teachers."""
     logger.info("Creating teacher network...")
 
     if activations_path is not None:
-        if imagenet_subset:
+        if imagenet_path is not None:
             logger.info(f"Adopting teacher database to {num_classes} classes.")
             network = DatabaseNetwork(activations_path, 1000)
-            return ImagenetSubsetWrapper(network, num_classes)
+            return ImagenetSubsetWrapper(
+                network, num_classes, imagenet_subset_path, imagenet_path
+            )
         return DatabaseNetwork(activations_path, num_classes)
 
     network = create_network(
@@ -40,7 +44,8 @@ def create_teacher(
         model_path=model_path,
         version=version,
         download=download,
-        imagenet_subset=imagenet_subset,
+        imagenet_path=imagenet_path,
+        imagenet_subset_path=imagenet_subset_path,
     )
 
     return Teacher(network)
@@ -64,4 +69,3 @@ class DatabaseNetwork(Teacher):
     def forward(self, idx, x):
         activations = torch.tensor(np.array(self.activations[idx.cpu().numpy()]))
         return activations.to(idx.device)
-

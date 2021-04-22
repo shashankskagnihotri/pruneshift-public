@@ -151,7 +151,7 @@ class KnowledgeDistill(nn.Module):
             logits, logits_aug0, logits_aug1 = torch.split(logits, len(logits) // 3)
 
             if self.augmix_jensen:
-                _, _, logits_aug1 = torch.split(logits, len(logits) // 3)
+                _, _, logits_aug1 = torch.split(teacher_logits, len(teacher_logits) // 3)
     
             loss_js = js_divergence(logits, logits_aug0, logits_aug1) * self.augmix_alpha * self.beta
             stats["loss_augmix"] = loss_js
@@ -425,3 +425,4 @@ class ContrastiveDistill(nn.Module):
             return loss_cls + loss_kd + loss_crd + loss_js, stats
 
         return loss_cls + loss_kd + loss_crd, stats
+
