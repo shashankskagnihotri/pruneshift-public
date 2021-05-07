@@ -8,7 +8,6 @@ import torch.nn as nn
 import torch.nn.functional as F
 from pytorch_lightning.metrics.functional import accuracy
 
-from distiller_zoo import DistillKL
 from crd.criterion import CRDLoss
 from pruneshift.teachers import Teacher
 from pruneshift.network_markers import at_entry_points
@@ -37,6 +36,19 @@ def js_divergence(logits0, logits1, logits2):
                    + F.kl_div(p_mixture, p_aug1, reduction="batchmean")
                    + F.kl_div(p_mixture, p_aug2, reduction="batchmean")
            ) / 3.0
+
+
+class DistillKL(nn.Module):
+    """Distilling the Knowledge in a Neural Network"""
+    def __init__(self, T):
+        super(DistillKL, self).__init__()
+        self.T = T
+
+    def forward(self, y_s, y_t):        
+        p_s = F.log_softmax(y_s/self.T, dim=1)
+        p_t = F.softmax(y_t/self.T, dim=1)
+        loss = F.kl_div(p_s, p_t, size_average=False) * (self.T**2) / y_s.shape[0]
+        return loss
 
 
 class StandardLoss(nn.Module):
