@@ -21,6 +21,7 @@ def create_teacher(
     model_path: str = None,
     version: int = None,
     download: bool = False,
+    scaling_factor: float = 1.,
     imagenet_subset_path: Optional[str] = None,
     imagenet_path: Optional[str] = None,
 ):
@@ -44,6 +45,7 @@ def create_teacher(
         model_path=model_path,
         version=version,
         download=download,
+        scaling_factor=scaling_factor,
         imagenet_path=imagenet_path,
         imagenet_subset_path=imagenet_subset_path,
     )

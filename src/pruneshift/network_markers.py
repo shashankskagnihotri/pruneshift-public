@@ -23,8 +23,8 @@ def protected(network: nn.Module):
     network = _unwrap(network)
 
     # To be consistent.
-    if isinstance(network, RESNET_CLASSES):
-        return [classifier(network), network.conv1]
+    # if isinstance(network, RESNET_CLASSES):
+    #     return [classifier(network), network.conv1]
 
     return [classifier(network)]
 
@@ -37,6 +37,8 @@ def classifier(network: nn.Module):
         return network.fc
     elif isinstance(network, tv_models.MNASNet):
         return network.classifier[-1]
+    elif isinstance(network, tv_models.MobileNetV2):
+        return network.classifier[-1]
     else:
         raise NotImplementedError
 
@@ -46,9 +48,18 @@ def at_entry_points(network: nn.Module):
     network = _unwrap(network)
 
     if isinstance(network, RESNET_CLASSES):
-        return {"layer1": network.layer1,
-                "layer2": network.layer2,
-                "layer3": network.layer3,
-                "layer4": network.layer4}
+        return {"layer0": network.layer1,
+                "layer1": network.layer2,
+                "layer2": network.layer3,
+                "layer3": network.layer4}
+    elif isinstance(network, tv_models.MobileNetV2):
+        num_blocks = len(network.features)
+        indices = [i for i in range(num_blocks - 1, 0, - num_blocks // 4)][::-1]
+        return {f"layer{num}": network.features[idx] for num, idx in enumerate(indices)}
+    elif isinstance(network, tv_models.MNASNet):
+        num_blocks = len(network.layers)
+        indices = [i for i in range(num_blocks - 1, 0, - num_blocks // 4)][::-1]
+        return {f"layer{num}": network.layers[idx] for num, idx in enumerate(indices)}
     else:
         raise NotImplementedError
+

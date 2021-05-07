@@ -62,7 +62,7 @@ class ShiftDataModule(pl.LightningDataModule):
         deepaugment_path: str = None,
         test_train: bool = False,
         test_corrupted: bool = True,
-        test_renditions: bool = False,
+        test_renditions: Union[bool, str] = False,
         with_normalize: bool = True,
         crd: bool = False,
         only_test_transform: bool = False,
@@ -98,8 +98,10 @@ class ShiftDataModule(pl.LightningDataModule):
             return 50000
         elif self.name == "cifar100":
             return 50000
-        # TODO (Jasper): Fix this in the end.
-        return 129756
+        elif self.name == "imagenet":
+            return len(ImageFolder(Path(self.root) / "train"))
+        else:
+            raise NotImplementedError
 
     def create_dataset(self, train: bool):
         # TODO: Add the possibility of a val_split again.
@@ -129,6 +131,8 @@ class ShiftDataModule(pl.LightningDataModule):
 
     def create_rendition_dataset(self):
         assert self.name == "imagenet"
+        if isinstance(self.test_renditions, str):
+            return ImageFolder(self.test_renditions)
         return ImageFolder(Path(self.root) / "renditions")
 
     def create_deepaugment_dataset(self, train_dataset):

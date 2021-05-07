@@ -2,6 +2,7 @@
 
 name: resnet50
 ckpt_path: ${path.model}/imagenetr_models/augmix.pth.tar
-imagenet_subset: True
+imagenet_subset_path: ${datamodule.root}/train
+imagenet_path: ${path.imagenet1000}/train
 num_classes: ${network.num_classes}
 group: imagenet

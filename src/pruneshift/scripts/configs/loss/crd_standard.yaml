@@ -4,8 +4,8 @@ loss:
   _target_: pruneshift.losses.ContrastiveDistill
   augmix_alpha: 12
   kd_T: 4.
-  charlie: 0.2
-  delta: 0.4
+  charlie: 0.2  # kd 
+  delta: 0.4  # crd 
   beta: 1
   feat_dim: 128
   nce_k: 16384

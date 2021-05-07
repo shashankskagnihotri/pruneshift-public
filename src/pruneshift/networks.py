@@ -1,4 +1,5 @@
 """ Bundles different kind of network create functions."""
+# TODO: (Jasper) Remove protect_classifier function.
 from functools import partial
 import re
 from pathlib import Path
@@ -40,6 +41,8 @@ def protect_classifier(name: str, network: nn.Module):
     elif name[:8] == "densenet":
         network.classifier.is_protected = True
     elif name[:7] == "mnasnet":
+        network.classifier[-1].is_protected = True
+    elif name[:9] == "mobilenet":
         network.classifier[-1].is_protected = True
     else:
         raise NotImplementedError
@@ -101,8 +104,7 @@ def create_network(
         if hasattr(imagenet_models, name):
             if scaling_factor != 1.0:
                 logger.info(f"Scaling the network {scaling_factor} times.")
-                network_fn = getattr(scalable_resnet, name)
-                network_fn = partial(network_fn, scaling_factor=scaling_factor)
+                network_fn = _scalable_imagenet_models(name, scaling_factor)
             else:
                 network_fn = getattr(imagenet_models, name)
         else:
@@ -118,7 +120,7 @@ def create_network(
     create_num_classes = num_classes
     subset_wrap = False
 
-    if imagenet_path is not None:
+    if imagenet_path is not None and num_classes != 1000:
         subset_wrap = True
         create_num_classes = 1000
 
@@ -178,6 +180,18 @@ class ImagenetSubsetWrapper(nn.Module):
 
     def forward(self, *args):
         return self.network(*args)[..., self.perm[: self.num_classes]]
+
+
+def _scalable_imagenet_models(name: str, scaling_factor: float):
+    if name == "mobilenet_v2":
+        return partial(imagenet_models.mobilenet_v2, width_mult=scaling_factor)
+    elif name == "mnasnet":
+        return partial(imagenet_models.MNASNet, alpha=scaling_factor)
+    elif name[: 6] == "resnet":
+        return partial(getattr(scalable_resnet, name), scaling_factor=scaling_factor)
+    
+    raise NotImplementedError
+
 
 
 def add_reset_hook(network: nn.Module, network_factory: Callable, version=0):

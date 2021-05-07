@@ -5,7 +5,7 @@ datamodule:
     root: ${path.imagenet1000}
     num_workers: 6
     test_corrupted: True
-    test_renditions: True
+    test_renditions: ${path.renditions}
     batch_size: 256 
 
 network:

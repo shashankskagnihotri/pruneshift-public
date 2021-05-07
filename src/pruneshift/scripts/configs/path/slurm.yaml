@@ -9,6 +9,7 @@ path:
     imagenet200: null
     imagenet1000: /data/datasets/ILSVRC2012
     deepaugment: /data/datasets/DeepAugment
+    renditions: /data/datasets/ImageNet/imagenet-r
 
 hydra:
     run:
@@ -23,7 +24,7 @@ hydra:
         # Set a really high timeout for the job, but often there is a limit.
         timeout_min: 1420 
         cpus_per_task: 32 
-        gpus_per_node: 4 
+        # gpus_per_node: 4 
         tasks_per_node: 1
         mem_gb: 40
         nodes: 1
@@ -37,8 +38,8 @@ hydra:
         # mem_per_cpu: 1000 
         signal_delay_s: 120
         max_num_timeout: 0
-        additional_parameters: {} # {"nodelist": dlcgpu13}
+        additional_parameters: {"gres": "gpu:4"} # {"nodelist": dlcgpu13}
         # How many runs should be at maximum that run parallel?
-        array_parallelism: 4 
+        array_parallelism: 12 
         # Commands before exectuing the main script.
         # setup: ["source /work/dlclarge2/hoffmaja-pruneshift/envs/pruneshift/bin/activate"]
