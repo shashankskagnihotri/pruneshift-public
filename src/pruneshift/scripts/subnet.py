@@ -35,7 +35,7 @@ def subnet(cfg):
     hydrate(network, **cfg.hydrate)
 
     module = VisionModule(network=network,
-                          test_labels=data.labels,
+                          datamodule=data,
                           optimizer_fn=optimizer_fn,
                           scheduler_fn=scheduler_fn,
                           train_loss=train_loss)

@@ -17,7 +17,6 @@ import pytorch_lightning as pl
 
 from .utils import safe_ckpt_load
 import cifar10_models as cifar_models
-import pytorch_resnet_cifar10.resnet as cifar_resnet
 import scalable_resnet
 import models as models
 

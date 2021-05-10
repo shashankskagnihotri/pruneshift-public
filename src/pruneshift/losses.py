@@ -265,6 +265,8 @@ class AttentionDistill(nn.Module):
             datamodule,
             p: float = 1.0,
             beta: float = 2.0,
+            charlie: float = 0.,
+            kd_T: float = 4.,
             augmix: bool = False,
             augmix_alpha: float = 12,
             **kwargs,
@@ -280,6 +282,8 @@ class AttentionDistill(nn.Module):
         self.p = p
         self.augmix = augmix
         self.augmix_alpha = augmix_alpha
+        self.charlie = charlie
+        self.criterion_kd = DistillKL(kd_T)
 
     def attention_map(self, features):
         """ Adopted from the RepDistiller repository."""
@@ -312,7 +316,7 @@ class AttentionDistill(nn.Module):
 
         # Teacher forward pass.
         with torch.no_grad():
-            self.teacher(idx, x)
+            teacher_logits = self.teacher(idx, x)
 
         # Studend forward pass.
         if self.augmix:
@@ -348,6 +352,12 @@ class AttentionDistill(nn.Module):
         at_loss = self.beta * sum(at_losses)
         stats["loss_AT"] = at_loss
 
+        if self.charlie > 0:
+            loss_kd = self.criterion_kd(logits, teacher_logits) * self.charlie
+            stats["loss_KD"] = loss_kd
+        else:
+            loss_kd = 0
+
         # Reset everything to delete the graphs (student).
         self.teacher_collector.reset()
         self.student_collector.reset()
@@ -355,9 +365,9 @@ class AttentionDistill(nn.Module):
         if self.augmix:
             augmix_loss = self.augmix_alpha * js_divergence(logits, logits_aug1, logits_aug2)
             stats["loss_augmix"] = augmix_loss
-            return loss + at_loss + augmix_loss, stats
+            return loss + at_loss + augmix_loss + loss_kd, stats
 
-        return loss + at_loss, stats
+        return loss + at_loss + loss_kd, stats
 
 
 class ContrastiveDistill(nn.Module):
