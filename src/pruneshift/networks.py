@@ -59,6 +59,8 @@ def create_network(
     imagenet_subset_path: str = None,
     imagenet_path: str = None,
     scaling_factor: float = 1.0,
+    supConLoss: bool = False,
+    feat_dim:int =128,
     **kwargs,
 ):
     """A function creating networks.
@@ -128,6 +130,17 @@ def create_network(
     if path is not None and group != "dataset":
         safe_ckpt_load(network, path)
 
+    
+    # Add the projection head if using SupConLoss:
+    if supConLoss:
+        if hasattr(network, "linear"):
+            dim_in= network.linear.in_features
+            network.linear = nn.Sequential(nn.Linear(dim_in, dim_in),nn.ReLU(inplace=True),nn.Linear(dim_in, feat_dim),nn.Linear(feat_dim, num_classes))
+        else:
+            dim_in=network.fc.in_features
+            network.fc = nn.Sequential(nn.Linear(dim_in, dim_in),nn.ReLU(inplace=True),nn.Linear(dim_in, feat_dim),nn.Linear(feat_dim, num_classes))
+
+    
     # 4. Adjust network with addtional wrappers, hooks and etc.
     # Protect classifier layers from pruning.
     if protect_classifier_fn is not None:

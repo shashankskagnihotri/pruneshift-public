@@ -8,6 +8,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from pytorch_lightning.metrics.functional import accuracy
 
+from SupCon.losses import SupConLoss
 from crd.criterion import CRDLoss
 from pruneshift.teachers import Teacher
 from pruneshift.network_markers import at_entry_points
@@ -448,3 +449,39 @@ class ContrastiveDistill(nn.Module):
 
         return loss_cls + loss_kd + loss_crd, stats
 
+
+
+class SupCon(nn.Module):
+    """Supervised Contrastive Learning: https://arxiv.org/pdf/2004.11362.pdf.
+    It also supports the unsupervised contrastive loss in SimCLR"""
+    def __init__(self, network: nn.Module, temperature=0.07, contrast_mode='all',
+                 base_temperature=0.07):
+        super(SupConLoss, self).__init__()
+        self.network = networkself.student_collector = ActivationCollector({"classifier": classifier(network)}, mode="in")
+        self.temperature = temperature
+        self.contrast_mode = contrast_mode
+        self.base_temperature = base_temperature
+        self.criterion = SupConLoss(temperature=base_temperature)
+        self.student_collector = ActivationCollector({"classifier": classifier(network)}, mode="in")
+
+    def forward(self, batch):
+        idx, x, labels = batch
+
+        if self.augmix:
+            x = torch.cat(x)
+        bsz = labels.shape[0]
+        features = self.network(x)
+        f_s = self.student_collector["classifier"]
+        f1, f2 = torch.split(features, [bsz, bsz], dim=0)
+        features = torch.cat([f1.unsqueeze(1), f2.unsqueeze(1)], dim=1)
+
+
+        loss = self.criterion(features, labels)
+        acc = 0
+
+
+        stats = {
+            "acc": acc,
+            "SupConLoss": loss,
+        }
+        return loss, stats
