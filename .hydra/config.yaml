@@ -1,0 +1,45 @@
+seed: 0
+checkpoint:
+  _target_: pytorch_lightning.callbacks.ModelCheckpoint
+  save_top_k: null
+  save_last: true
+path:
+  logdir: .
+  checkpoint: ${path.logdir}/checkpoints/
+  dataset: ${env:DATASET_PATH}
+  model: ${env:MODEL_PATH}
+  imagenet100: /misc/scratchSSD2/datasets/ILSVRC2012-100
+  imagenet200: /misc/scratchSSD2/datasets/ILSVRC2012-200
+  imagenet1000: /misc/scratchSSD2/datasets/ILSVRC2012
+  deepaugment: /misc/scratchSSD2/datasets/DeepAugment
+loss:
+  _target_: pruneshift.losses.StandardLoss
+network:
+  _target_: pruneshift.networks.create_network
+  name: resnet18
+  model_path: null
+  ckpt_path: null
+  version: null
+  num_classes: 100
+  group: cifar
+trainer:
+  _target_: pytorch_lightning.Trainer
+  gpus: 1
+  benchmark: true
+  accelerator: null
+  max_epochs: 100
+optimizer:
+  _target_: torch.optim.SGD
+  lr: 0.1
+  momentum: 0.9
+  weight_decay: 0.0002
+  nesterov: true
+datamodule:
+  name: cifar100
+  root: ${path.dataset}
+  num_workers: 10
+  batch_size: 128
+  test_corrupted: true
+scheduler:
+  _target_: pruneshift.modules.cosine_lr
+  T_max: ${trainer.max_epochs}

@@ -1,0 +1,14 @@
+# @package _global_
+
+loss:
+  _target_: pruneshift.losses.SupCon
+  temperature: 0.07
+  contrast_mode: 'all'
+  base_temperature: 0.07
+
+datamodule:
+  augmix: True
+
+network:
+  supConLoss: True
+  feat_dim: 128

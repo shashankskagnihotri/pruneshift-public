@@ -60,8 +60,8 @@ class StandardLoss(nn.Module):
     def forward(self, batch):
         # self.network.train()
         _, x, y = batch
-        #print(self.network)
-        #print(type(x))
+        print(self.network)
+        print(type(x))
         logits=self.network(x)
         loss=F.cross_entropy(logits,y)
         acc=accuracy(torch.argmax(logits,1),y)
