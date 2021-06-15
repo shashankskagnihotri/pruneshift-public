@@ -142,8 +142,8 @@ def create_network(
             network.classifier[-1].in_features=feat_dim
             classifier=network.classifier
         classifier.name="classifier"
-        #print(next(network.children()))
-        #print((network.children()))
+        print(next(network.children()))
+        print((network.children()))
         #layers = OrderedDict([("features",(*(list(network.children())[:-1])))])
         # layers = OrderedDict([("features",*(list(network.children())[:-1])), ("contrast", nn.Linear(dim_in, dim_in)), ("Relu",nn.ReLU(inplace=True)),("projection", nn.Linear(dim_in, feat_dim)),("classifier", classifier),])
         #layers =*(list(network.children())[:-1]), nn.Linear(dim_in, dim_in),nn.ReLU(inplace=True), nn.Linear(dim_in, feat_dim), classifier

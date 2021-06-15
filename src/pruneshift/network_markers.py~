@@ -41,7 +41,7 @@ def classifier(network: nn.Module):
         return network.classifier[-1]
     else:
         #raise NotImplementedError
-        #print(network)
+        print(network)
         return network[-1]
 
 
