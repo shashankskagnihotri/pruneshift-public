@@ -74,6 +74,10 @@ class BasicBlock(nn.Module):
     def forward(self, x: Tensor) :
         identity = x
         BasicBlock.counter += 1
+        print(self.parameters)
+        print('Number of basic block: ', BasicBlock.counter)
+        print('Type of x:', type(x))
+        print('\n\n\n')
         out = self.conv1(x)
         out = self.bn1(out)
         out = self.relu1(out)
