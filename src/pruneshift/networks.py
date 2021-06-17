@@ -137,7 +137,6 @@ def create_network(
             dim_in=network.fc.in_features
             network.fc.in_features=feat_dim
             classifier=nn.Linear(feat_dim,num_classes)
-            #classifier=network.fc
             network.fc=Identity()
         else:
             dim_in=network.classifier[-1].in_features
@@ -147,20 +146,8 @@ def create_network(
             #classifier=network.classifier
             network.classifier=Identity()
         classifier.name="classifier"
-        #print(next(network.children()))
-        #print((network.children()))
-        #layers = OrderedDict([("features",(*(list(network.children())[:-1])))])
         layers = OrderedDict([("features",network),("flatten", nn.Flatten()), ("contrast", nn.Linear(dim_in, dim_in)), ("Relu",nn.ReLU(inplace=True)),("projection", nn.Linear(dim_in, feat_dim)),("classifier", classifier),])
-        #layers =*(list(network.children())[:-1]), nn.Linear(dim_in, dim_in),nn.ReLU(inplace=True), nn.Linear(dim_in, feat_dim), classifier
-        #network = torch.nn.Sequential(*(list(network.children())[:-1]), nn.Linear(dim_in, dim_in),nn.ReLU(inplace=True), nn.Linear(dim_in, feat_dim), classifier)
-        #network = torch.nn.Sequential(network, nn.Linear(dim_in, dim_in),nn.ReLU(inplace=True), nn.Linear(dim_in, feat_dim), classifier)
         network = torch.nn.Sequential(layers)
-        #if hasattr(network, "linear"):
-            #dim_in= network.linear.in_features
-            #network.linear = nn.Sequential(nn.Linear(dim_in, dim_in),nn.ReLU(inplace=True),nn.Linear(dim_in, feat_dim),nn.Linear(feat_dim, num_classes))
-        #else:
-            #dim_in=network.fc.in_features
-            #network.fc = nn.Sequential(nn.Linear(dim_in, dim_in),nn.ReLU(inplace=True),nn.Linear(dim_in, feat_dim),nn.Linear(feat_dim, num_classes))
 
     # 4. Adjust network with addtional wrappers, hooks and etc.
     # Protect classifier layers from pruning.
