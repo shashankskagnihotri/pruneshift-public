@@ -276,6 +276,7 @@ class AttentionDistill(nn.Module):
             kd_T: float = 4.,
             augmix: bool = False,
             augmix_alpha: float = 12,
+            augmix_average: bool = False,
             **kwargs,
     ):
         super(AttentionDistill, self).__init__()
@@ -289,6 +290,7 @@ class AttentionDistill(nn.Module):
         self.p = p
         self.augmix = augmix
         self.augmix_alpha = augmix_alpha
+        self.augmix_average = augmix_average
         self.charlie = charlie
         self.criterion_kd = DistillKL(kd_T)
 
@@ -333,7 +335,7 @@ class AttentionDistill(nn.Module):
             logits = self.network(x)
 
         # Calculate the cross entropy loss.
-        loss = F.cross_entropy(logits, y)
+        loss = (1 - self.charlie) * F.cross_entropy(logits, y)
         stats["cross_entropy_loss"] = loss
         stats["acc"] = accuracy(torch.argmax(logits, 1), y)
 
@@ -345,7 +347,7 @@ class AttentionDistill(nn.Module):
             activation_student = self.student_collector[module_name]
             activation_teacher = self.teacher_collector[module_name]
 
-            if self.augmix:
+            if self.augmix and self.augmix_average:
                 # Average the activations.
                 n_s = len(activation_student) // 3
                 activation_student = sum(torch.split(activation_student, n_s)) / 3

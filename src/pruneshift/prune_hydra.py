@@ -1,6 +1,7 @@
 import os
 from pathlib import Path
 import math
+import logging
 from functools import partial
 
 import torch
@@ -11,6 +12,8 @@ import torch.optim as optim
 import pytorch_lightning as pl
 
 from pruneshift.prune_info import PruneInfo
+
+logger = logging.getLogger(__name__)
 
 
 class GetSubnet(autograd.Function):
@@ -38,8 +41,8 @@ class GetSubnetLn(autograd.Function):
     def forward(ctx, scores, k):
         # Taken from the torch prune module!
         # Calculates the norm accross the correct dimensions.
-        n=1
-        dim=0
+        n = 1
+        dim = 0
 
         dims = list(range(scores.dim()))
         # convert negative indexing
@@ -71,7 +74,7 @@ class GetSubnetLn(autograd.Function):
             return mask
 
         mask = make_mask(scores, dim, topk.indices)
-        return mask 
+        return mask
 
     @staticmethod
     def backward(ctx, g):
@@ -89,7 +92,7 @@ class HydraHook:
         param = getattr(module, name)
         # Register buffers the same way as the pruning model.
         del module._parameters[name]
-        module.register_buffer(name + "_orig", param)  # TODO: Should this be a buffer?
+        module.register_buffer(name + "_orig", param)
         n = nn.init._calculate_correct_fan(param, "fan_in")
         score = math.sqrt(6 / n) * param / torch.max(torch.abs(param))
         module.register_parameter(name + "_score", nn.Parameter(score))
@@ -119,15 +122,21 @@ class HydraHook:
         return self.name, mask
 
 
-def freeze_protected(info, reverse: bool = False):
+def set_grad_protected(info, requires_grad: bool):
     for submodule in info.network.modules():
         for name, param in submodule.named_parameters():
             if not info.is_protected(submodule):
                 continue
-            param.requires_grad = reverse
+            param.requires_grad = requires_grad 
 
 
-def hydrate(network: nn.Module, ratio: float, method="weight"):
+def hydrate(
+    network: nn.Module,
+    ratio: float = None,
+    amount: float = None,
+    method="weight",
+    freeze_protected: bool = False,
+):
     """ Prunes a model and prepare it for the hydra pruning phase."""
     if method == "weight":
         mask_cls = GetSubnet
@@ -136,8 +145,13 @@ def hydrate(network: nn.Module, ratio: float, method="weight"):
     else:
         raise ValueError(f"Unknown mask selection type {method}.")
 
-    info = PruneInfo(network, {nn.Linear: ["weight"], nn.Conv2d: ["weight"]})
+    # Make this more customizable.
+    info = PruneInfo(network, {nn.Linear: ["weight", "bias"], nn.Conv2d: ["weight"]})
 
+    assert ratio != amount
+
+    ratio = ratio if ratio is not None else 1 / (1 - amount)
+    # Take protected layers into account.
     amount = info.ratio_to_amount(ratio)
 
     target_pairs = set(info.target_pairs())
@@ -145,8 +159,9 @@ def hydrate(network: nn.Module, ratio: float, method="weight"):
     for module, param_name in target_pairs:
         HydraHook(module, param_name, amount, mask_cls=mask_cls)
 
-    # freeze_protected(info)
-    # network.fc.bias.requires_grad = False
+    if freeze_protected:
+        set_grad_protected(info, False)
+
     return info
 
 
@@ -162,8 +177,8 @@ def dehydrate(network: nn.Module):
             del module._forward_pre_hooks[k]
             custom_from_mask(module, param_name, mask)
 
-    # network.fc.bias.requires_grad = True
-    # freeze_protected(info, True)
+    set_grad_protected(info, True)
+
 
 def is_hydrated(network: nn.Module):
     for module in network.modules():
@@ -172,4 +187,3 @@ def is_hydrated(network: nn.Module):
                 return True
 
     return False
-

@@ -104,7 +104,10 @@ def prune(
     elif method == "l1_channels":
         pruning_cls = partial(prune_torch.ln_structured, n=1, dim=0)
         layerwise = True
-    elif method == "random":
+    elif method == "random_channels":
+        pruning_cls = partial(prune_torch.random_structured, dim=0) 
+        layerwise = True 
+    elif method == "random_weight":
         pruning_cls = prune_torch.RandomUnstructured
         layerwise = False
     elif method == "zero_weights":
@@ -114,6 +117,9 @@ def prune(
         raise ValueError(f"Unknown pruning method: {method}")
 
     prune_info = PruneInfo(network)
+
+    # Calculate the amount that needs to pruned, to reach the 
+    # target size.
     amount = prune_info.ratio_to_amount(ratio)
     simple_prune(prune_info, pruning_cls, layerwise, amount=amount)
 

@@ -17,6 +17,10 @@ from torch.optim.lr_scheduler import LambdaLR
 from pruneshift.losses import StandardLoss
 from pruneshift.utils import get_model_complexity_prune
 from pruneshift.datamodules import ShiftDataModule
+from .prune_hydra import hydrate
+from .prune_hydra import dehydrate
+from .prune_hydra import is_hydrated
+from .prune_info import PruneInfo
 
 
 logger = logging.getLogger(__name__)
@@ -201,3 +205,69 @@ class PrunedModule(VisionModule):
         if self.prune_interval is not None and self.trainer.current_epoch > 0:
             if self.trainer.current_epoch % self.prune_interval == 0:
                 self.prune()
+
+
+# class HydraModule(VisionModule):
+# 
+#     def __init__(
+#         self,
+#         network: nn.Module,
+#         datamodule,
+#         ratio: float,
+#         hydra_max_epochs: int,
+#         method: str = "weight",
+#         train_loss: nn.Module = None,
+#         optimizer_fn=optim.Adam,
+#         scheduler_fn=None,
+#         hydra_train_loss: nn.Module = None,
+#         hydra_optimizer_fn=None,
+#         hydra_scheduler_fn=None,
+#     ):
+#         super(HydraModule, self).__init__(
+#             network=network,
+#             datamodule=datamodule,
+#             train_loss=train_loss,
+#             optimizer_fn=optimizer_fn,
+#             scheduler_fn=scheduler_fn,
+#         )
+# 
+#         self.ratio = ratio
+#         self.hydra_max_epochs = hydra_max_epochs
+#         self.method = method
+# 
+#         def default(opt_variable, default):
+#             return default if opt_variable is None else default
+# 
+#         # Just  set this as a default.
+#         hydra_scheduler_fn = partial(cosine_lr, T_max=hydra_max_epochs)
+# 
+#         self._train_losses = nn.ModuleDict({"hydra": default(hydra_train_loss, train_loss), "tune": train_loss})
+#         self._optimizer_fns = {"hydra": default(hydra_optimizer_fn, optimizer_fn), "tune": optimizer_fn}
+#         self._scheduler_fns = {"hydra": default(hydra_scheduler_fn, scheduler_fn), "tune": scheduler_fn}
+# 
+#         self.set_state("hydra")
+# 
+#     def set_state(self, mode):
+#         # self.print(f"Activated {mode} mode.")
+# 
+#         if mode == "tune" and is_hydrated(self.network):
+#             self.print("Dehydrate network!")
+#             dehydrate(self.network)
+#         elif mode == "hydra":
+#             # self.print("Hydrate network!")
+#             hydrate(self.network, self.ratio, self.method)
+# 
+#         self.train_loss = self._train_losses[mode]
+#         self.optimizer_fn = self._optimizer_fns[mode]
+#         self.scheduler_fn = self._scheduler_fns[mode]
+# 
+#         # self.trainer.accelerator_backend.setup_optimizers(self)
+# 
+#     def on_train_epoch_start(self):
+#         if self.trainer.current_epoch == 0:
+#             # self.set_state("hydra")
+#             return
+# 
+#         if self.trainer.current_epoch == self.hydra_max_epochs:
+#             self.set_state("tune")
+# 

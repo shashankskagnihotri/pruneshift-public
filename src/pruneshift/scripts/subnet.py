@@ -12,8 +12,7 @@ from pruneshift.scripts.utils import create_loss
 from pruneshift.scripts.utils import print_test_results
 from pruneshift.modules import VisionModule 
 from pruneshift.datamodules import ShiftDataModule
-from pruneshift.prune_hydra import hydrate 
-from pruneshift.networks import protect_classifier
+from pruneshift.prune_hydra import hydrate
 
 
 logger = logging.getLogger(__name__)
@@ -25,20 +24,22 @@ def subnet(cfg):
     save_config(cfg)
     # Note that the trainer must be created first, for the seeding.
     trainer = create_trainer(cfg)
-    network = call(cfg.network, protect_classifier_fn=protect_classifier)
+    network = call(cfg.network)
     data = ShiftDataModule(**cfg.datamodule)
     optimizer_fn = partial_instantiate(cfg.optimizer)
     scheduler_fn = partial_instantiate(cfg.scheduler)
     train_loss = create_loss(cfg, network, data)
 
-    logger.info("Bringing the network into the mask optimization state.")
-    hydrate(network, **cfg.hydrate)
+    logger.info("Bring the module into hydra state!")
+    hydrate(network, **cfg.subnet)
 
-    module = VisionModule(network=network,
-                          datamodule=data,
-                          optimizer_fn=optimizer_fn,
-                          scheduler_fn=scheduler_fn,
-                          train_loss=train_loss)
+    module = VisionModule(
+        network=network,
+        datamodule=data,
+        optimizer_fn=optimizer_fn,
+        scheduler_fn=scheduler_fn,
+        train_loss=train_loss,
+    )
 
     trainer.fit(module, datamodule=data)
     results = trainer.test(module, datamodule=data, verbose=False)

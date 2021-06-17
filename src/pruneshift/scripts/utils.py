@@ -12,7 +12,7 @@ from pytorch_lightning.loggers import CSVLogger
 from pytorch_lightning.callbacks import LearningRateMonitor
 from pytorch_lightning.utilities import rank_zero_only
 
-from pruneshift.teachers import create_teacher
+from pruneshift.networks import create_teacher
 from pruneshift.modules import CORRUPTION_REGEX
 
 logger = logging.getLogger(__name__)
@@ -73,6 +73,10 @@ def create_trainer(cfg: DictConfig):
         logger.info(f"Number of repeats: {cfg.repeat}")
         max_epochs *= cfg.repeat
 
+    if "tune" in cfg:
+        logger.info(f"Double the num of epochs.")
+        max_epochs *= 2
+
     trainer = instantiate(
         cfg.trainer,
         max_epochs=max_epochs,
@@ -88,12 +92,12 @@ def create_trainer(cfg: DictConfig):
     return trainer
 
 
-def create_loss(cfg: DictConfig, network, datamodule):
+def create_loss(cfg: DictConfig, network, datamodule, loss_attr="loss"):
     if "teacher" in cfg:
         teacher = create_teacher(**cfg.teacher)
         return instantiate(cfg.loss, network=network, teacher=teacher, datamodule=datamodule)
 
-    return instantiate(cfg.loss, network=network, datamodule=datamodule)
+    return instantiate(cfg[loss_attr], network=network, datamodule=datamodule)
 
 @rank_zero_only
 def print_test_results(results):

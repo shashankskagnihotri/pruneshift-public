@@ -1,9 +1,8 @@
 """ Bundles different kind of network create functions."""
-# TODO: (Jasper) Remove protect_classifier function.
 from functools import partial
 import re
 from pathlib import Path
-from typing import Callable
+from typing import Callable, Optional
 from typing import Optional
 import logging
 
@@ -15,7 +14,12 @@ import torchvision.models.mnasnet as mnasnet
 import timm
 import pytorch_lightning as pl
 from collections import OrderedDict
+from pruneshift.teachers import logger, DatabaseNetwork, Teacher
+from pruneshift.utils import ImagenetSubsetWrapper
+
 from .utils import safe_ckpt_load
+from .utils import ImagenetSubsetWrapper
+from .network_markers import protect_classifier
 import cifar10_models as cifar_models
 import scalable_resnet
 import models as models
@@ -27,26 +31,6 @@ logger = logging.getLogger(__name__)
 mnasnet._BN_MOMENTUM = 0.1
 
 
-def protect_classifier(name: str, network: nn.Module):
-    """ Defines which layers are protected. """
-    if name[:6] == "resnet":
-        if hasattr(network, "linear"):
-            network.linear.is_protected = True
-        else:
-            network.fc.is_protected = True
-        network.conv1.is_protected = True
-    elif name[:3] == "vgg":
-        network.classifier[-1].is_protected = True
-    elif name[:8] == "densenet":
-        network.classifier.is_protected = True
-    elif name[:7] == "mnasnet":
-        network.classifier[-1].is_protected = True
-    elif name[:9] == "mobilenet":
-        network.classifier[-1].is_protected = True
-    else:
-        raise NotImplementedError
-
-
 def create_network(
     group: str,
     name: str,
@@ -54,7 +38,6 @@ def create_network(
     ckpt_path: str = None,
     model_path: str = None,
     version: int = None,
-    protect_classifier_fn: Optional[Callable] = None,
     download: bool = False,
     imagenet_subset_path: str = None,
     imagenet_path: str = None,
@@ -73,8 +56,6 @@ def create_network(
             database.
         model_path: Directory to find checkpoints in.
         version: Version of the checkpoint.
-        protect_classifier_fn: Function that marks classifiers for
-            protectionfrom pruning.
         download: Whether to download a model from torchvision. Only
             possible for imagenet1000.
         imagenet_subset_path: When given we wrap networks that were
@@ -127,10 +108,14 @@ def create_network(
 
     network = network_fn(num_classes=create_num_classes, **kwargs)
 
+    # Protect classifier layers from pruning must come before
+    # ckpt loading for hydra.
+    protect_classifier(network)
+
     if path is not None and group != "dataset":
         safe_ckpt_load(network, path)
 
-    
+
     # Add the projection head if using SupConLoss:
     if supConLoss:
         if name[:6]=="resnet":
@@ -150,9 +135,6 @@ def create_network(
         network = torch.nn.Sequential(layers)
 
     # 4. Adjust network with addtional wrappers, hooks and etc.
-    # Protect classifier layers from pruning.
-    if protect_classifier_fn is not None:
-        protect_classifier_fn(name, network)
 
     # When downloaded we change the label scheme from the activations..
     if subset_wrap:
@@ -164,7 +146,13 @@ def create_network(
     # Add a reset hook for lottery style pruning.
     add_reset_hook(
         network,
-        partial(create_network, group=group, name=name, num_classes=num_classes),
+        partial(
+            create_network,
+            group=group,
+            name=name,
+            num_classes=num_classes,
+            scaling_factor=scaling_factor,
+        ),
         version,
     )
 
@@ -214,11 +202,10 @@ def _scalable_imagenet_models(name: str, scaling_factor: float):
         return partial(imagenet_models.mobilenet_v2, width_mult=scaling_factor)
     elif name == "mnasnet":
         return partial(imagenet_models.MNASNet, alpha=scaling_factor)
-    elif name[: 6] == "resnet":
+    elif name[:6] == "resnet":
         return partial(getattr(scalable_resnet, name), scaling_factor=scaling_factor)
-    
-    raise NotImplementedError
 
+    raise NotImplementedError
 
 
 def add_reset_hook(network: nn.Module, network_factory: Callable, version=0):
@@ -248,3 +235,44 @@ def _resolve_path(
         return Path(model_path) / f"{group}{num_classes}_{name}.{version}"
 
     return None
+
+
+def create_teacher(
+    group: str = None,
+    name: str = None,
+    num_classes: int = None,
+    activations_path: str = None,
+    ckpt_path: str = None,
+    model_path: str = None,
+    version: int = None,
+    download: bool = False,
+    scaling_factor: float = 1.0,
+    imagenet_subset_path: Optional[str] = None,
+    imagenet_path: Optional[str] = None,
+):
+    """Creates teachers."""
+    logger.info("Creating teacher network...")
+
+    if activations_path is not None:
+        if imagenet_path is not None:
+            logger.info(f"Adopting teacher database to {num_classes} classes.")
+            network = DatabaseNetwork(activations_path, 1000)
+            return ImagenetSubsetWrapper(
+                network, num_classes, imagenet_subset_path, imagenet_path
+            )
+        return DatabaseNetwork(activations_path, num_classes)
+
+    network = create_network(
+        group=group,
+        name=name,
+        num_classes=num_classes,
+        ckpt_path=ckpt_path,
+        model_path=model_path,
+        version=version,
+        download=download,
+        scaling_factor=scaling_factor,
+        imagenet_path=imagenet_path,
+        imagenet_subset_path=imagenet_subset_path,
+    )
+
+    return Teacher(network)

@@ -1,0 +1,23 @@
+# @package _global_
+
+datamodule:
+    name: imagenet
+    root: ${path.imagenet100}
+    num_workers: 6 
+    test_corrupted: True
+    test_renditions: True
+    batch_size: 256
+
+network:
+    num_classes: 100
+    group: imagenet
+
+trainer:
+    max_epochs: 15
+
+scheduler:
+    _target_: pruneshift.modules.cosine_lr
+    T_max: ${trainer.max_epochs}
+
+optimizer:
+    lr: 0.1

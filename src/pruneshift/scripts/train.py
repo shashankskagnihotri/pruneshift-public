@@ -19,7 +19,7 @@ def train(cfg):
     save_config(cfg)
     trainer = create_trainer(cfg)
     # Currently we should initialize the trainer first because of the seed.
-    network = call(cfg.network, protect_classifier_fn=None)
+    network = call(cfg.network)
     data = ShiftDataModule(**cfg.datamodule)
     optimizer_fn = partial_instantiate(cfg.optimizer)
     scheduler_fn = partial_instantiate(cfg.scheduler)
@@ -33,9 +33,9 @@ def train(cfg):
 
     if cfg.trainer.max_epochs > 0:
         trainer.fit(module, datamodule=data)
+
     test_results = trainer.test(module, datamodule=data, verbose=False)
     print_test_results(test_results)
 
 if __name__ == "__main__":
     train()
-

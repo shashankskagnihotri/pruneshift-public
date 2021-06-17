@@ -1,25 +1,21 @@
 """ Provides the data modules we need for our experiments."""
 import logging
-from typing import Optional
-from typing import Union
 from pathlib import Path
-from itertools import product
+from typing import Union
 
+from augmix.dataset import AugMixWrapper
+import pytorch_lightning as pl
 from torch.utils.data import DataLoader
-from torch.utils.data import Subset
 from torch.utils.data import ConcatDataset
+from torchvision import transforms
 import torchvision.datasets as torch_datasets
 from torchvision.datasets import ImageFolder
-from torchvision import transforms
-import pytorch_lightning as pl
 
 from .datasets import CIFAR10C
 from .datasets import CIFAR100C
 from .datasets import ImageNetC
 from .datasets import TransformWrapper
-from .datasets import SplitImageFolder
 from .datasets import ImageFolderSubset
-from augmix.dataset import AugMixWrapper
 from .datasets import CRDWrapper
 
 logger = logging.getLogger(__name__)

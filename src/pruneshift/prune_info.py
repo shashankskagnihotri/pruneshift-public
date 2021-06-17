@@ -3,6 +3,7 @@ and allows to calculate the information accordingly."""
 from typing import Iterable, Dict, Tuple
 
 import pandas as pd
+import numpy as np
 import torch
 import torch.nn as nn
 from torch.nn.utils import prune
@@ -139,7 +140,10 @@ class PruneInfo:
             # auxiliarly buffer.
             curr_size = param_size(module, param_name)
 
-            comp = orig_size / curr_size
+            if curr_size == 0:
+                comp = np.inf
+            else:
+                comp = orig_size / curr_size
             shape = tuple(param.shape)
             rows.append(
                 [

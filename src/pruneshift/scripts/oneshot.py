@@ -14,7 +14,6 @@ from pruneshift.scripts.utils import print_test_results
 from pruneshift.datamodules import ShiftDataModule
 from pruneshift.modules import PrunedModule
 from pruneshift.prune import prune
-from pruneshift.networks import protect_classifier
 
 
 logger = logging.getLogger(__name__)
@@ -27,7 +26,7 @@ def oneshot(cfg):
     save_config(cfg)
     # Note that the trainer must be created first, for the seeding.
     trainer = create_trainer(cfg)
-    network = call(cfg.network, protect_classifier_fn=protect_classifier)
+    network = call(cfg.network)
     data = ShiftDataModule(**cfg.datamodule)
     prune_fn = partial(prune, **cfg.prune)
     optimizer_fn = partial_instantiate(cfg.optimizer)

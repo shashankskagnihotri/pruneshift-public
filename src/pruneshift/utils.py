@@ -13,7 +13,10 @@ from torchvision.models.mnasnet import MNASNet
 from pruneshift.prune_hydra import hydrate
 from pruneshift.prune_hydra import dehydrate
 from pruneshift.prune_hydra import is_hydrated
+from .prune_info import PruneInfo
 
+
+logger = logging.getLogger(__name__)
 
 
 def safe_ckpt_load(network: nn.Module, path: Union[str, Path]):
@@ -50,30 +53,28 @@ def load_state_dict(network, path: Union[str, Path]):
         return state_dict
 
     # Some old checkpoints do have the train_loss and val_loss state dicts.
-    state_dict = {n: p for n, p in state_dict.items() if not n[: 3] == "val"}
-    
+    state_dict = {n: p for n, p in state_dict.items() if not n[:3] == "val"}
 
     # Some old checkpoints do have the train_loss and val_loss state dicts.
-    state_dict = {n: p for n, p in state_dict.items() if not n[: 3] == "val"}
-    
+    state_dict = {n: p for n, p in state_dict.items() if not n[:3] == "val"}
 
     def prune_name(name):
         idx = name.find(".")
         # Prune the network part due to the lightning module.
-        if name[: idx] == "train_loss":
-            return prune_name(name[idx + 1 :]) 
-        if name[: idx] == "network":
+        if name[:idx] == "train_loss":
+            return prune_name(name[idx + 1 :])
+        if name[:idx] == "network":
             return name[idx + 1 :]
-        if name[: idx] == "module":
+        if name[:idx] == "module":
             return name[idx + 1 :]
         return name
-
 
     return {prune_name(n): p for n, p in state_dict.items()}
 
 
 def load_hydrated_state_dict(network: nn.Module, state_dict):
     """ Loads a hydrated network and brings it into finetuning phase."""
+    logger.info("Load hydrated checkpoint!")
     hydrate(network, ratio=1)
     network.load_state_dict(state_dict)
     dehydrate(network)
@@ -185,3 +186,33 @@ def get_model_complexity_prune(
         custom_modules_hooks=custom_modules_hooks,
     )
 
+
+class ImagenetSubsetWrapper(nn.Module):
+    """Changes predictions for models trained on imagenet to a subset."""
+
+    def __init__(
+        self,
+        network: nn.Module,
+        num_classes: int,
+        root: str,
+        super_root: str,
+    ):
+        super(ImagenetSubsetWrapper, self).__init__()
+        self.num_classes = num_classes
+        self.root = root
+        self.super_root = super_root
+        self.network = network
+        self.perm = self.calculate_permutation()
+
+    def calculate_permutation(self):
+        class_dirs = sorted([p.stem for p in Path(self.root).iterdir()])
+        super_class_dirs = sorted([p.stem for p in Path(self.super_root).iterdir()])
+
+        # The first part contains the class indices of the subset.
+        perm = [super_class_dirs.index(cd) for cd in class_dirs]
+        # The second part contains the class indices not in the subset.
+        perm.extend(set(range(len(super_class_dirs))) - set(perm))
+        return torch.tensor(perm)
+
+    def forward(self, *args):
+        return self.network(*args)[..., self.perm[: self.num_classes]]

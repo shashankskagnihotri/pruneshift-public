@@ -5,7 +5,8 @@ import timm.models as timm_models
 import scalable_resnet
 
 import models as custom_models
-from pruneshift.teachers import ImagenetSubsetWrapper, Teacher
+from .teachers import Teacher
+from .utils import ImagenetSubsetWrapper 
 
 
 RESNET_CLASSES = (tv_models.ResNet, custom_models.ResNet, timm_models.ResNet, scalable_resnet.ResNet)
@@ -18,15 +19,14 @@ def _unwrap(network: nn.Module):
     return network
 
 
-def protected(network: nn.Module):
-    """ Returns layers that should be protected."""
+def protect_classifier(network: nn.Module):
+    """ Marks the classification layers as non prunable."""
     network = _unwrap(network)
 
-    # To be consistent.
-    # if isinstance(network, RESNET_CLASSES):
-    #     return [classifier(network), network.conv1]
+    if isinstance(network, RESNET_CLASSES):
+        network.conv1.is_protected = True
 
-    return [classifier(network)]
+    classifier(network).is_protected = True
 
 
 def classifier(network: nn.Module):

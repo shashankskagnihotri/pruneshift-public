@@ -1,16 +1,17 @@
 defaults:
     - hydra/launcher: submitit_slurm
-    - checkpoint: last
+    - checkpoint: period  # This makes a checkpoint at the end of the hydra phase.
     - path: standard
     - loss: standard
     - network: pretrained
-    - trainer: standard
+    - trainer: ddp 
     - teacher:
     - optimizer: sgd
     - datamodule: cifar100
 
-hydrate:
-    ratio: 4
+subnet:
+    ratio: null 
+    amount: null
     method: "weight"
 
 trainer:

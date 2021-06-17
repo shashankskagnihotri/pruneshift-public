@@ -1,5 +1,4 @@
 import argparse
-from pathlib import Path
 import torch
 
 from pruneshift.utils import load_state_dict

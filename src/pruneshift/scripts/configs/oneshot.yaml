@@ -4,7 +4,7 @@ defaults:
     - path: standard
     - loss: standard
     - network: pretrained
-    - trainer: standard
+    - trainer: ddp
     - teacher:
     - optimizer: sgd
     - datamodule: cifar100

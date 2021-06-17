@@ -2,5 +2,6 @@
 
 prune:
     method: global_weight
-    amount: 0.5
+    amount: null 
+    ratio: null
 
