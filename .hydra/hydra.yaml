@@ -2,8 +2,8 @@ hydra:
   run:
     dir: ${path.logdir}
   sweep:
-    dir: multirun/${now:%Y-%m-%d}/${now:%H-%M-%S}
-    subdir: ${hydra.job.num}
+    dir: ${path.logdir}
+    subdir: ${path.logdir}/${hydra.job.num}
   hydra_logging:
     version: 1
     formatters:
@@ -46,23 +46,24 @@ hydra:
     _target_: hydra._internal.core_plugins.basic_sweeper.BasicSweeper
     max_batch_size: null
   launcher:
-    submitit_folder: ${hydra.sweep.dir}/.submitit/%j
-    timeout_min: 60
-    cpus_per_task: 1
+    submitit_folder: ${hydra.sweep.dir}/.submitit/
+    timeout_min: 1420
+    cpus_per_task: 32
     gpus_per_node: 0
     tasks_per_node: 1
-    mem_gb: 4
+    mem_gb: 40
     nodes: 1
     name: ${hydra.job.name}
     _target_: hydra_plugins.hydra_submitit_launcher.submitit_launcher.SlurmLauncher
-    partition: null
+    partition: alldlc_gpu-rtx2080
     comment: null
     constraint: null
     exclude: null
     signal_delay_s: 120
     max_num_timeout: 0
-    additional_parameters: {}
-    array_parallelism: 256
+    additional_parameters:
+      gres: gpu:4
+    array_parallelism: 12
     setup: null
   help:
     app_name: ${hydra.job.name}
@@ -123,10 +124,11 @@ hydra:
   overrides:
     hydra: []
     task:
+    - path=slurm
     - path.logdir=.
   job:
     name: train
-    override_dirname: path.logdir=.
+    override_dirname: path.logdir=.,path=slurm
     id: ???
     num: ???
     config_name: train.yaml
@@ -139,5 +141,5 @@ hydra:
         exclude_keys: []
   runtime:
     version: 1.0.6
-    cwd: /misc/student/agnihotr/pruneshift
+    cwd: /work/dlclarge2/agnihotr-shashank-pruneshift/pruneshift
   verbose: false
