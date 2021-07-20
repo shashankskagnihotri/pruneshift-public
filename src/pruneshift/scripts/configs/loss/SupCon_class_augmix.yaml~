@@ -1,7 +1,0 @@
-# @package _global_
-loss:
-  _target_: pruneshift.losses.AugmixLoss
-  augmix_alpha: 12.
-
-datamodule:
-  augmix: True

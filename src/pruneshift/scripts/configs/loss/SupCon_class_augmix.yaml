@@ -2,9 +2,11 @@
 loss:
   _target_: pruneshift.losses.AugmixLoss
   augmix_alpha: 12.
+  supCon: True
 
 datamodule:
   augmix: True
 
 network:
   supConLoss: True
+  classifying: True
