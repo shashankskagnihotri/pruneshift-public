@@ -4,3 +4,4 @@ _target_: pruneshift.losses.StandardLoss
 
 network:
   supConLoss: True
+  classifying: True

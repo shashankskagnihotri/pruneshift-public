@@ -44,6 +44,7 @@ def create_network(
     scaling_factor: float = 1.0,
     supConLoss: bool = False,
     classifying:bool = False,
+    testing : bool = False,
     feat_dim:int =128,
     **kwargs,
 ):
@@ -132,7 +133,18 @@ def create_network(
 
     #load network weights
     if path is not None and group != "dataset":
-        safe_ckpt_load(network, path)
+        if not testing:
+            safe_ckpt_load(network, path)
+        else:
+            ckpt=torch.load(path)
+            state_dict=ckpt['model']
+            new_state_dict={}
+            for k, v in state_dict.items():
+                k=k.replace("module.","")
+                k=k.replace("shortcut", "downsample")
+                new_state_dict[k]=v
+            state_dict=new_state_dict
+            network.load_state_dict(state_dict)
 
     if classifying:
         layers = OrderedDict([("encoder", network.features), ("classifier", classifier)])

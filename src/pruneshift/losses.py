@@ -53,17 +53,20 @@ class DistillKL(nn.Module):
 
 
 class StandardLoss(nn.Module):
-    def __init__(self, network: nn.Module, datamodule=None):
+    def __init__(self, network: nn.Module, datamodule=None, supCon: bool= False):
         super(StandardLoss, self).__init__()
         self.network = network
+        self.supCon = supCon
 
     def forward(self, batch):
-        # self.network.train()
         _, x, y = batch
-        #print(self.network)
-        #print(type(x))
-        #import pdb;pdb.set_trace()
-        logits=self.network(x)
+        if self.supCon:
+            self.network.encoder.eval()
+            with torch.no_grad():
+                features=self.network.encoder(x)
+            logits=self.network.classifier(features)
+        else:
+            logits=self.network(x)
         loss=F.cross_entropy(logits,y)
         acc=accuracy(torch.argmax(logits,1),y)
         return loss, {"acc":acc}
