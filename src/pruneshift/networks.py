@@ -9,6 +9,7 @@ import logging
 import numpy as np
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 import torchvision.models as imagenet_models
 import torchvision.models.mnasnet as mnasnet
 import timm

@@ -1,10 +1,10 @@
 # @package _global_
 
 path:
-    logdir: /work/dlclarge2/hoffmaja-pruneshift/debug_runs/${now:%Y-%m-%d}/${now:%H-%M-%S}
+    logdir: /work/dlclarge2/agnihotr-shashank-pruneshift/debug_runs/${now:%Y-%m-%d}/${now:%H-%M-%S}
     checkpoint: ${path.logdir}/model_ckpts/
-    dataset: /work/dlclarge2/hoffmaja-pruneshift/datasets
-    model: /work/dlclarge2/hoffmaja-pruneshift/models
+    dataset: /work/dlclarge2/agnihotr-shashank-pruneshift/hoffmaja-pruneshift/datasets
+    model: /work/dlclarge2/agnihotr-shashank-pruneshift/hoffmaja-pruneshift/models
     imagenet100: ${path.dataset}/ILSVRC2012-100
     imagenet200: null
     imagenet1000: /data/datasets/ILSVRC2012
