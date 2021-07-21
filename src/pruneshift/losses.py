@@ -514,7 +514,7 @@ class KD_SupCon(nn.Module):
     """Supervised Contrastive Learning: https://arxiv.org/pdf/2004.11362.pdf.
     """
     def __init__(self, network: nn.Module, teacher: Teacher, temperature=0.07, contrast_mode='all', augmix:bool=False,
-            base_temperature=0.07, **kwargs):
+            base_temperature=0.07, feat_dim:int=128, **kwargs):
         super(KD_SupCon, self).__init__()
         self.network=network
         self.teacher=teacher
@@ -526,6 +526,12 @@ class KD_SupCon(nn.Module):
         in_feats=self.network.projection.out_features
         self.classification=nn.Linear(in_feats,100)
         self.teacher_collector = ActivationCollector({"classifier": classifier(teacher)}, mode="in")
+        dim_in=self.teacher.network.fc.in_features
+        feat_dim=feat_dim
+        self.flatten=nn.Flatten()
+        self.contrast=nn.Linear(dim_in, dim_in)
+        self.relu=nn.ReLU(inplace=True)
+        self.projection=nn.Linear(dim_in, feat_dim)        
 
 
     def forward(self, batch):
@@ -538,9 +544,12 @@ class KD_SupCon(nn.Module):
             self.teacher(idx,x)
 
         teacher_features=self.teacher_collector["classifier"]
+        with torch.no_grad():
+            teacher_features=F.normalize(self.projection(self.relu((self.contrast(self.flatten(teacher_features))))))
         logits=self.classification(features)
         logits_clean, logits_aug1, logits_aug2= torch.split(logits, logits.shape[0] //3)
         f1, f2, f3 = torch.split(features, [bsz, bsz, bsz], dim=0)
+
         t_f1, t_f2, t_f3 = torch.split(teacher_features, [bsz, bsz, bsz], dim=0)
         features = torch.cat([f1.unsqueeze(1), f2.unsqueeze(1), f3.unsqueeze(1), t_f1.unsqueeze(1), t_f2.unsqueeze(1), t_f3.unsqueeze(1)], dim=1)
 
