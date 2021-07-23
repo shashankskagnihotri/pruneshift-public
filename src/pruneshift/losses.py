@@ -7,12 +7,16 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from pytorch_lightning.metrics.functional import accuracy
-
+import torchvision.models
+import timm.models
+import scalable_resnet
+import models
 from SupCon.losses import SupConLoss
 from crd.criterion import CRDLoss
 from pruneshift.teachers import Teacher
 from pruneshift.network_markers import at_entry_points
 from pruneshift.network_markers import classifier
+from .utils import ImagenetSubsetWrapper
 
 logger = logging.getLogger(__name__)
 
@@ -186,8 +190,10 @@ class KnowledgeDistill(nn.Module):
     
             loss_js = js_divergence(logits, logits_aug0, logits_aug1) * self.augmix_alpha * self.beta
             stats["loss_augmix"] = loss_js
+            loss_cls = (F.cross_entropy(logits, y)+ loss_js) * (1 - self.kd_mixture)
 
-        loss_cls = F.cross_entropy(logits, y) * (1 - self.kd_mixture)
+        else:
+            loss_cls = F.cross_entropy(logits, y) * (1 - self.kd_mixture)
         stats["cross_entropy_loss"] = loss_cls
         stats["acc"] = accuracy(torch.argmax(logits, 1), y)
         stats["loss_kd"] = loss_kd
@@ -526,7 +532,11 @@ class KD_SupCon(nn.Module):
         in_feats=self.network.projection.out_features
         self.classification=nn.Linear(in_feats,100)
         self.teacher_collector = ActivationCollector({"classifier": classifier(teacher)}, mode="in")
-        dim_in=self.teacher.network.fc.in_features
+        RESNET_CLASSES = (torchvision.models.ResNet, models.ResNet, timm.models.ResNet, scalable_resnet.ResNet)
+        if isinstance(self.teacher.network, RESNET_CLASSES):
+            dim_in=self.teacher.network.fc.in_features
+        else:
+            dim_in=self.teacher.network.network.fc.in_features
         feat_dim=feat_dim
         self.flatten=nn.Flatten()
         self.contrast=nn.Linear(dim_in, dim_in)

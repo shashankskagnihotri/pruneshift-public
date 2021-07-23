@@ -112,6 +112,9 @@ def create_network(
     network = network_fn(num_classes=create_num_classes, **kwargs)
 
 
+    # Protect classifier layers from pruning must come before
+    # ckpt loading for hydra.
+    protect_classifier(network)
 
 
     # Add the projection head if using SupConLoss:
@@ -128,9 +131,6 @@ def create_network(
         layers = OrderedDict([("features",network),("flatten", nn.Flatten()), ("contrast", nn.Linear(dim_in, dim_in)), ("Relu",nn.ReLU(inplace=True)),("projection", nn.Linear(dim_in, feat_dim)),("normalize", normalize),])
         network = torch.nn.Sequential(layers)
 
-    # Protect classifier layers from pruning must come before
-    # ckpt loading for hydra.
-    protect_classifier(network)
 
     #load network weights
     if path is not None and group != "dataset":

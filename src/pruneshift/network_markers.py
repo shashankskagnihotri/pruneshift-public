@@ -41,8 +41,9 @@ def classifier(network: nn.Module):
         return network.classifier[-1]
     else:
         #raise NotImplementedError
-        #print(network)
-        return network[-1]
+        network=network.network
+        #return network[-1]
+        return classifier(network)
 
 
 def at_entry_points(network: nn.Module):
