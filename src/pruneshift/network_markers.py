@@ -64,5 +64,7 @@ def at_entry_points(network: nn.Module):
         indices = [i for i in range(num_blocks - 1, 0, - num_blocks // 4)][::-1]
         return {f"layer{num}": network.layers[idx] for num, idx in enumerate(indices)}
     else:
-        raise NotImplementedError
+        network=network.network
+        at_entry_points(network)
+        #raise NotImplementedError
 

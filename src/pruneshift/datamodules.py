@@ -63,7 +63,7 @@ class ShiftDataModule(pl.LightningDataModule):
         with_normalize: bool = True,
         crd: bool = False,
         only_test_transform: bool = False,
-        val_split: float = 0.2,
+        val_split: float = 0.0,
         deepaugment_entire: bool = True,
     ):
         super(ShiftDataModule, self).__init__()

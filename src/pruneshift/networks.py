@@ -47,6 +47,7 @@ def create_network(
     classifying:bool = False,
     testing : bool = False,
     feat_dim:int =128,
+    loading_final_supcon: bool = False,
     **kwargs,
 ):
     """A function creating networks.
@@ -131,6 +132,9 @@ def create_network(
         layers = OrderedDict([("features",network),("flatten", nn.Flatten()), ("contrast", nn.Linear(dim_in, dim_in)), ("Relu",nn.ReLU(inplace=True)),("projection", nn.Linear(dim_in, feat_dim)),("normalize", normalize),])
         network = torch.nn.Sequential(layers)
 
+    if loading_final_supcon and classifying:
+        layers = OrderedDict([("encoder", network.features), ("classifier", classifier)])
+        network = torch.nn.Sequential(layers)
 
     #load network weights
     if path is not None and group != "dataset":
@@ -147,7 +151,7 @@ def create_network(
             state_dict=new_state_dict
             network.load_state_dict(state_dict)
 
-    if classifying:
+    if classifying and not loading_final_supcon:
         layers = OrderedDict([("encoder", network.features), ("classifier", classifier)])
         network = torch.nn.Sequential(layers)
 

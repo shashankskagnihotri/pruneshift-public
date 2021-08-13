@@ -497,15 +497,19 @@ class SupCon(nn.Module):
         idx, x, labels = batch
         #print('\n\n\n\n\nAugmix:', self.augmix)
 
-        #if self.augmix:
-            #x = torch.cat(x)
-        x=torch.cat(x)
+        if self.augmix:
+            x = torch.cat(x)
+        #x=torch.cat(x)
         bsz = labels.shape[0]
         features = self.network(x)
         logits=self.classification(features)
-        logits_clean, logits_aug1, logits_aug2= torch.split(logits, logits.shape[0] //3)
-        f1, f2, f3 = torch.split(features, [bsz, bsz, bsz], dim=0)
-        features = torch.cat([f1.unsqueeze(1), f2.unsqueeze(1), f3.unsqueeze(1)], dim=1)
+        if self.augmix:
+            logits_clean, logits_aug1, logits_aug2= torch.split(logits, logits.shape[0] //3)
+            f1, f2, f3 = torch.split(features, [bsz, bsz, bsz], dim=0)
+            features = torch.cat([f1.unsqueeze(1), f2.unsqueeze(1), f3.unsqueeze(1)], dim=1)
+        else:
+            logits_clean = logits
+            features = torch.cat([features.unsqueeze(1)], dim=1)
 
         loss = self.criterion(features, labels)
         acc = accuracy(torch.argmax(logits_clean,1), labels)
@@ -546,22 +550,30 @@ class KD_SupCon(nn.Module):
 
     def forward(self, batch):
         idx, x, labels = batch
-        x=torch.cat(x)
+        if self.augmix:
+            x=torch.cat(x)
 
         bsz = labels.shape[0]
         features=self.network(x)
         with torch.no_grad():
             self.teacher(idx,x)
 
-        teacher_features=self.teacher_collector["classifier"]
+            teacher_features=self.teacher_collector["classifier"]
         with torch.no_grad():
             teacher_features=F.normalize(self.projection(self.relu((self.contrast(self.flatten(teacher_features))))))
-        logits=self.classification(features)
-        logits_clean, logits_aug1, logits_aug2= torch.split(logits, logits.shape[0] //3)
-        f1, f2, f3 = torch.split(features, [bsz, bsz, bsz], dim=0)
+            logits=self.classification(features)
+        if self.augmix:
+            with torch.no_grad():
+                logits_clean, logits_aug1, logits_aug2= torch.split(logits, logits.shape[0] //3)
+                t_f1, t_f2, t_f3 = torch.split(teacher_features, [bsz, bsz, bsz], dim=0)
+            f1, f2, f3 = torch.split(features, [bsz, bsz, bsz], dim=0)
 
-        t_f1, t_f2, t_f3 = torch.split(teacher_features, [bsz, bsz, bsz], dim=0)
-        features = torch.cat([f1.unsqueeze(1), f2.unsqueeze(1), f3.unsqueeze(1), t_f1.unsqueeze(1), t_f2.unsqueeze(1), t_f3.unsqueeze(1)], dim=1)
+            t_f1, t_f2, t_f3 = torch.split(teacher_features, [bsz, bsz, bsz], dim=0)
+            features = torch.cat([f1.unsqueeze(1), f2.unsqueeze(1), f3.unsqueeze(1), t_f1.unsqueeze(1), t_f2.unsqueeze(1), t_f3.unsqueeze(1)], dim=1)
+        else:
+            with torch.no_grad():
+                logits_clean=logits
+            features = torch.cat([features.unsqueen(1), teacher_features.unsqueeze(1)], dim=1)
 
         loss = self.criterion(features, labels)
         acc = accuracy(torch.argmax(logits_clean,1), labels)
