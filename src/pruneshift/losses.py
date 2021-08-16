@@ -480,8 +480,8 @@ class ContrastiveDistill(nn.Module):
 class SupCon(nn.Module):
     """Supervised Contrastive Learning: https://arxiv.org/pdf/2004.11362.pdf.
     It also supports the unsupervised contrastive loss in SimCLR"""
-    def __init__(self, network: nn.Module, temperature=0.07, contrast_mode='all', augmix:bool=False,
-                 base_temperature=0.07, **kwargs):
+    def __init__(self, network: nn.Module, temperature=0.1, contrast_mode='all', augmix:bool=False,
+                 base_temperature=0.1, **kwargs):
         super(SupCon, self).__init__()
         self.network=network
         self.temperature = temperature
@@ -489,8 +489,8 @@ class SupCon(nn.Module):
         self.contrast_mode = contrast_mode
         self.base_temperature = base_temperature
         self.criterion = SupConLoss(temperature=base_temperature)
-        in_feats=self.network.projection.out_features
-        self.classification = nn.Linear(in_feats,100)
+        #in_feats=self.network.projection.out_features
+        #self.classification = nn.Linear(in_feats,100)
       
 
     def forward(self, batch):
@@ -502,20 +502,20 @@ class SupCon(nn.Module):
         #x=torch.cat(x)
         bsz = labels.shape[0]
         features = self.network(x)
-        logits=self.classification(features)
+        #logits=self.classification(features)
         if self.augmix:
-            logits_clean, logits_aug1, logits_aug2= torch.split(logits, logits.shape[0] //3)
+            #logits_clean, logits_aug1, logits_aug2= torch.split(logits, logits.shape[0] //3)
             f1, f2, f3 = torch.split(features, [bsz, bsz, bsz], dim=0)
             features = torch.cat([f1.unsqueeze(1), f2.unsqueeze(1), f3.unsqueeze(1)], dim=1)
         else:
-            logits_clean = logits
+            #logits_clean = logits
             features = torch.cat([features.unsqueeze(1)], dim=1)
 
         loss = self.criterion(features, labels)
-        acc = accuracy(torch.argmax(logits_clean,1), labels)
+        #acc = accuracy(torch.argmax(logits_clean,1), labels)
+        #acc= 0
         stats = {          
-            "acc": acc,
-	    "SupConLoss": loss,
+            "SupConLoss": loss,
         }
         return loss, stats
 
@@ -523,29 +523,31 @@ class SupCon(nn.Module):
 class KD_SupCon(nn.Module):
     """Supervised Contrastive Learning: https://arxiv.org/pdf/2004.11362.pdf.
     """
-    def __init__(self, network: nn.Module, teacher: Teacher, temperature=0.07, contrast_mode='all', augmix:bool=False,
-            base_temperature=0.07, feat_dim:int=128, **kwargs):
+    def __init__(self, network: nn.Module, teacher: Teacher, temperature=0.1, contrast_mode='all', augmix:bool=False,
+            base_temperature=0.1, feat_dim:int=128, **kwargs):
         super(KD_SupCon, self).__init__()
         self.network=network
-        self.teacher=teacher
+        with torch.no_grad():
+            self.teacher=teacher
         self.temperature = temperature
         self.augmix=augmix
         self.contrast_mode = contrast_mode
         self.base_temperature = base_temperature
         self.criterion = SupConLoss(temperature=base_temperature)
-        in_feats=self.network.projection.out_features
-        self.classification=nn.Linear(in_feats,100)
-        self.teacher_collector = ActivationCollector({"classifier": classifier(teacher)}, mode="in")
-        RESNET_CLASSES = (torchvision.models.ResNet, models.ResNet, timm.models.ResNet, scalable_resnet.ResNet)
-        if isinstance(self.teacher.network, RESNET_CLASSES):
-            dim_in=self.teacher.network.fc.in_features
-        else:
-            dim_in=self.teacher.network.network.fc.in_features
-        feat_dim=feat_dim
-        self.flatten=nn.Flatten()
-        self.contrast=nn.Linear(dim_in, dim_in)
-        self.relu=nn.ReLU(inplace=True)
-        self.projection=nn.Linear(dim_in, feat_dim)        
+        #in_feats=self.network.projection.out_features
+        #self.classification=nn.Linear(in_feats,100)
+        with torch.no_grad():
+            self.teacher_collector = ActivationCollector({"classifier": classifier(teacher)}, mode="in")
+            RESNET_CLASSES = (torchvision.models.ResNet, models.ResNet, timm.models.ResNet, scalable_resnet.ResNet)
+            if isinstance(self.teacher.network, RESNET_CLASSES):
+                dim_in=self.teacher.network.fc.in_features
+            else:
+                dim_in=self.teacher.network.network.fc.in_features
+            feat_dim=feat_dim
+            self.flatten=nn.Flatten()
+            self.contrast=nn.Linear(dim_in, dim_in)
+            self.relu=nn.ReLU(inplace=True)
+            self.projection=nn.Linear(dim_in, feat_dim)        
 
 
     def forward(self, batch):
@@ -561,10 +563,10 @@ class KD_SupCon(nn.Module):
             teacher_features=self.teacher_collector["classifier"]
         with torch.no_grad():
             teacher_features=F.normalize(self.projection(self.relu((self.contrast(self.flatten(teacher_features))))))
-            logits=self.classification(features)
+            #logits=self.classification(features)
         if self.augmix:
             with torch.no_grad():
-                logits_clean, logits_aug1, logits_aug2= torch.split(logits, logits.shape[0] //3)
+                #logits_clean, logits_aug1, logits_aug2= torch.split(logits, logits.shape[0] //3)
                 t_f1, t_f2, t_f3 = torch.split(teacher_features, [bsz, bsz, bsz], dim=0)
             f1, f2, f3 = torch.split(features, [bsz, bsz, bsz], dim=0)
 
@@ -572,12 +574,13 @@ class KD_SupCon(nn.Module):
             features = torch.cat([f1.unsqueeze(1), f2.unsqueeze(1), f3.unsqueeze(1), t_f1.unsqueeze(1), t_f2.unsqueeze(1), t_f3.unsqueeze(1)], dim=1)
         else:
             with torch.no_grad():
-                logits_clean=logits
-            features = torch.cat([features.unsqueen(1), teacher_features.unsqueeze(1)], dim=1)
+                #logits_clean=logits
+                features = torch.cat([features.unsqueen(1), teacher_features.unsqueeze(1)], dim=1)
 
         loss = self.criterion(features, labels)
-        acc = accuracy(torch.argmax(logits_clean,1), labels)
-        stats = {"acc": acc, "SupConLoss": loss,}
+        #acc = accuracy(torch.argmax(logits_clean,1), labels)
+        #acc=0
+        stats = {"SupConLoss": loss,}
                                                 
         return loss, stats
 
