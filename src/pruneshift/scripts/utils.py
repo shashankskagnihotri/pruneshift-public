@@ -83,7 +83,8 @@ def create_trainer(cfg: DictConfig):
         logger=loggers,
         callbacks=callbacks,
         deterministic=deterministic,
-        weights_save_path=cfg.path.logdir,
+        weights_save_path=cfg.path.logdir#,
+        #precision=16
     )
 
     # Check if we need to correct the batch_size.

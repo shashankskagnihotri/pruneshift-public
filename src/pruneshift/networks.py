@@ -9,6 +9,7 @@ import logging
 import numpy as np
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 import torchvision.models as imagenet_models
 import torchvision.models.mnasnet as mnasnet
 import timm
@@ -43,7 +44,10 @@ def create_network(
     imagenet_path: str = None,
     scaling_factor: float = 1.0,
     supConLoss: bool = False,
+    classifying:bool = False,
+    testing : bool = False,
     feat_dim:int =128,
+    loading_final_supcon: bool = False,
     **kwargs,
 ):
     """A function creating networks.
@@ -79,7 +83,11 @@ def create_network(
 
     if group == "cifar":
         if name[:6] == "resnet":
-            network_fn = getattr(models, name)
+            if scaling_factor==1.0:
+                network_fn = getattr(models, name)
+            else:
+                logger.info(f"Scaling the network {scaling_factor} times.")
+                network_fn =  partial(getattr(models, name), prune=scaling_factor)
         else:
             network_fn = getattr(models, name)
     elif group == "imagenet":
@@ -108,34 +116,50 @@ def create_network(
 
     network = network_fn(num_classes=create_num_classes, **kwargs)
 
+
     # Protect classifier layers from pruning must come before
     # ckpt loading for hydra.
     protect_classifier(network)
-
-    if path is not None and group != "dataset":
-        safe_ckpt_load(network, path)
 
 
     # Add the projection head if using SupConLoss:
     if supConLoss:
         if name[:6]=="resnet":
             dim_in=network.fc.in_features
-            network.fc.in_features=feat_dim
-            classifier=nn.Linear(feat_dim,num_classes)
+            classifier=network.fc
             network.fc=Identity()
         else:
             dim_in=network.classifier[-1].in_features
-            network.classifier[-1].in_features=feat_dim
-            relu_layer=network.classifier[-2]
-            classifier=torch.nn.Sequential(relu_layer,nn.Linear(feat_dim,num_classes))
-            #classifier=network.classifier
+            classifier=network.classifier
             network.classifier=Identity()
-        classifier.name="classifier"
-        layers = OrderedDict([("features",network),("flatten", nn.Flatten()), ("contrast", nn.Linear(dim_in, dim_in)), ("Relu",nn.ReLU(inplace=True)),("projection", nn.Linear(dim_in, feat_dim)),("classifier", classifier),])
+        normalize=Normalize()
+        layers = OrderedDict([("features",network),("flatten", nn.Flatten()), ("contrast", nn.Linear(dim_in, dim_in)), ("Relu",nn.ReLU(inplace=True)),("projection", nn.Linear(dim_in, feat_dim)),("normalize", normalize),])
+        network = torch.nn.Sequential(layers)
+
+    if loading_final_supcon and classifying:
+        layers = OrderedDict([("encoder", network.features), ("classifier", classifier)])
+        network = torch.nn.Sequential(layers)
+
+    #load network weights
+    if path is not None and group != "dataset":
+        if not testing:
+            safe_ckpt_load(network, path)
+        else:
+            ckpt=torch.load(path)
+            state_dict=ckpt['model']
+            new_state_dict={}
+            for k, v in state_dict.items():
+                k=k.replace("module.","")
+                k=k.replace("shortcut", "downsample")
+                new_state_dict[k]=v
+            state_dict=new_state_dict
+            network.load_state_dict(state_dict)
+
+    if classifying and not loading_final_supcon:
+        layers = OrderedDict([("encoder", network.features), ("classifier", classifier)])
         network = torch.nn.Sequential(layers)
 
     # 4. Adjust network with addtional wrappers, hooks and etc.
-
     # When downloaded we change the label scheme from the activations..
     if subset_wrap:
         logger.info(f"Adopting network from imagenet1000 to imagenet{num_classes}.")
@@ -165,6 +189,11 @@ class Identity(nn.Module):
     def forward(self,x):
         return x
 
+class Normalize(nn.Module):
+    def __init__(self):
+        super(Normalize, self).__init__()
+    def forward(self,x):
+        return F.normalize(x)
 
 class ImagenetSubsetWrapper(nn.Module):
     """Changes predictions for models trained on imagenet to a subset."""
@@ -203,6 +232,10 @@ def _scalable_imagenet_models(name: str, scaling_factor: float):
     elif name == "mnasnet":
         return partial(imagenet_models.MNASNet, alpha=scaling_factor)
     elif name[:6] == "resnet":
+        return partial(getattr(scalable_resnet, name), scaling_factor=scaling_factor)
+    elif name[:7] == "resnext":
+        return partial(getattr(scalable_resnet, name), scaling_factor=scaling_factor)
+    elif name[:11] == "wide_resnet":
         return partial(getattr(scalable_resnet, name), scaling_factor=scaling_factor)
 
     raise NotImplementedError

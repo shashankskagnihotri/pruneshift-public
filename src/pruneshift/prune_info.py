@@ -106,7 +106,7 @@ class PruneInfo:
                 f"Compression ratio {ratio} can not be achieved, as the "
                  "percentage of prunable parameters is too low."
             )
-            raise ValueError(msg)
+            #raise ValueError(msg)
         return amount
 
     def network_size(self, original: bool = False, as_bits: bool = False) -> int:

@@ -1,8 +1,12 @@
 # @package _global_
 loss:
-  _target_: pruneshift.losses.AugmixLoss
+  _target_: pruneshift.losses.KnowledgeDistill
   augmix_alpha: 12.
   supCon: True
+  kd_T: 4.
+  beta: 1.
+  kd_mixture: 0.9
+  augmix: True
 
 datamodule:
   augmix: True

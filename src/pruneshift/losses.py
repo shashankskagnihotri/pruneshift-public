@@ -7,12 +7,16 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from pytorch_lightning.metrics.functional import accuracy
-
+import torchvision.models
+import timm.models
+import scalable_resnet
+import models
 from SupCon.losses import SupConLoss
 from crd.criterion import CRDLoss
 from pruneshift.teachers import Teacher
 from pruneshift.network_markers import at_entry_points
 from pruneshift.network_markers import classifier
+from .utils import ImagenetSubsetWrapper
 
 logger = logging.getLogger(__name__)
 
@@ -53,17 +57,20 @@ class DistillKL(nn.Module):
 
 
 class StandardLoss(nn.Module):
-    def __init__(self, network: nn.Module, datamodule=None):
+    def __init__(self, network: nn.Module, datamodule=None, supCon: bool= False):
         super(StandardLoss, self).__init__()
         self.network = network
+        self.supCon = supCon
 
     def forward(self, batch):
-        # self.network.train()
         _, x, y = batch
-        #print(self.network)
-        #print(type(x))
-        #import pdb;pdb.set_trace()
-        logits=self.network(x)
+        if self.supCon:
+            self.network.encoder.eval()
+            with torch.no_grad():
+                features=self.network.encoder(x)
+            logits=self.network.classifier(features)
+        else:
+            logits=self.network(x)
         loss=F.cross_entropy(logits,y)
         acc=accuracy(torch.argmax(logits,1),y)
         return loss, {"acc":acc}
@@ -78,6 +85,7 @@ class AugmixLoss(nn.Module):
             network: nn.Module,
             datamodule,
             augmix_alpha: float = 12.0,
+            supCon: bool = False
     ):
         """Implements the AugmixLoss from the augmix paper.
 
@@ -87,12 +95,20 @@ class AugmixLoss(nn.Module):
         super(AugmixLoss, self).__init__()
         self.network = network
         self.augmix_alpha = augmix_alpha
+        self.supCon = supCon
 
     def forward(self, batch):
         idx, x, y = batch
 
         # Split the augmix samples.
-        logits = self.network(torch.cat(x))
+        if self.supCon:
+            self.network.encoder.eval()
+            self.network.classifier.train()
+            with torch.no_grad():
+                features = self.network.encoder(torch.cat(x))
+            logits=self.network.classifier(features)
+        else:
+            logits = self.network(torch.cat(x))
         logits = torch.split(logits, len(logits) // 3)
 
         loss_js = self.augmix_alpha * js_divergence(*logits)
@@ -174,8 +190,10 @@ class KnowledgeDistill(nn.Module):
     
             loss_js = js_divergence(logits, logits_aug0, logits_aug1) * self.augmix_alpha * self.beta
             stats["loss_augmix"] = loss_js
+            loss_cls = (F.cross_entropy(logits, y)+ loss_js) * (1 - self.kd_mixture)
 
-        loss_cls = F.cross_entropy(logits, y) * (1 - self.kd_mixture)
+        else:
+            loss_cls = F.cross_entropy(logits, y) * (1 - self.kd_mixture)
         stats["cross_entropy_loss"] = loss_cls
         stats["acc"] = accuracy(torch.argmax(logits, 1), y)
         stats["loss_kd"] = loss_kd
@@ -462,7 +480,7 @@ class ContrastiveDistill(nn.Module):
 class SupCon(nn.Module):
     """Supervised Contrastive Learning: https://arxiv.org/pdf/2004.11362.pdf.
     It also supports the unsupervised contrastive loss in SimCLR"""
-    def __init__(self, network: nn.Module, temperature=0.07, contrast_mode='all', augmix:bool=False,
+    def __init__(self, network: nn.Module, temperature=0.1, contrast_mode='all', augmix:bool=False,
                  base_temperature=0.07, **kwargs):
         super(SupCon, self).__init__()
         self.network=network
@@ -471,27 +489,98 @@ class SupCon(nn.Module):
         self.contrast_mode = contrast_mode
         self.base_temperature = base_temperature
         self.criterion = SupConLoss(temperature=base_temperature)
-        self.student_collector = ActivationCollector({"classifier": classifier(network)}, mode="in")
+        #in_feats=self.network.projection.out_features
+        #self.classification = nn.Linear(in_feats,100)
       
 
     def forward(self, batch):
         idx, x, labels = batch
         #print('\n\n\n\n\nAugmix:', self.augmix)
 
-        #if self.augmix:
-            #x = torch.cat(x)
-        x=torch.cat(x)
+        if self.augmix:
+            x = torch.cat(x)
+        #x=torch.cat(x)
         bsz = labels.shape[0]
-        logits = self.network(x)
-        logits_clean, logits_aug1, logits_aug2= torch.split(logits, logits.shape[0] //3)
-        features= self.student_collector["classifier"]
-        f1, f2, f3 = torch.split(features, [bsz, bsz, bsz], dim=0)
-        features = torch.cat([f1.unsqueeze(1), f2.unsqueeze(1), f3.unsqueeze(1)], dim=1)
+        features = self.network(x)
+        #logits=self.classification(features)
+        if self.augmix:
+            #logits_clean, logits_aug1, logits_aug2= torch.split(logits, logits.shape[0] //3)
+            f1, f2, f3 = torch.split(features, [bsz, bsz, bsz], dim=0)
+            features = torch.cat([f1.unsqueeze(1), f2.unsqueeze(1), f3.unsqueeze(1)], dim=1)
+        else:
+            #logits_clean = logits
+            features = torch.cat([features.unsqueeze(1)], dim=1)
 
         loss = self.criterion(features, labels)
-        acc = accuracy(torch.argmax(logits_clean,1), labels)
+        #acc = accuracy(torch.argmax(logits_clean,1), labels)
+        #acc= 0
         stats = {          
-            "acc": acc,
-	    "SupConLoss": loss,
+            "SupConLoss": loss,
         }
         return loss, stats
+
+
+class KD_SupCon(nn.Module):
+    """Supervised Contrastive Learning: https://arxiv.org/pdf/2004.11362.pdf.
+    """
+    def __init__(self, network: nn.Module, teacher: Teacher, temperature=0.1, contrast_mode='all', augmix:bool=False,
+            base_temperature=0.07, feat_dim:int=128, **kwargs):
+        super(KD_SupCon, self).__init__()
+        self.network=network
+        with torch.no_grad():
+            self.teacher=teacher
+        self.temperature = temperature
+        self.augmix=augmix
+        self.contrast_mode = contrast_mode
+        self.base_temperature = base_temperature
+        self.criterion = SupConLoss(temperature=base_temperature)
+        #in_feats=self.network.projection.out_features
+        #self.classification=nn.Linear(in_feats,100)
+        with torch.no_grad():
+            self.teacher_collector = ActivationCollector({"classifier": classifier(teacher)}, mode="in")
+            RESNET_CLASSES = (torchvision.models.ResNet, models.ResNet, timm.models.ResNet, scalable_resnet.ResNet)
+            if isinstance(self.teacher.network, RESNET_CLASSES):
+                dim_in=self.teacher.network.fc.in_features
+            else:
+                dim_in=self.teacher.network.network.fc.in_features
+            feat_dim=feat_dim
+            self.flatten=nn.Flatten()
+            self.contrast=nn.Linear(dim_in, dim_in)
+            self.relu=nn.ReLU(inplace=True)
+            self.projection=nn.Linear(dim_in, feat_dim)        
+
+
+    def forward(self, batch):
+        idx, x, labels = batch
+        if self.augmix:
+            x=torch.cat(x)
+
+        bsz = labels.shape[0]
+        features=self.network(x)
+        with torch.no_grad():
+            self.teacher(idx,x)
+
+            teacher_features=self.teacher_collector["classifier"]
+        with torch.no_grad():
+            teacher_features=F.normalize(self.projection(self.relu((self.contrast(self.flatten(teacher_features))))))
+            #logits=self.classification(features)
+        if self.augmix:
+            with torch.no_grad():
+                #logits_clean, logits_aug1, logits_aug2= torch.split(logits, logits.shape[0] //3)
+                t_f1, t_f2, t_f3 = torch.split(teacher_features, [bsz, bsz, bsz], dim=0)
+            f1, f2, f3 = torch.split(features, [bsz, bsz, bsz], dim=0)
+
+            t_f1, t_f2, t_f3 = torch.split(teacher_features, [bsz, bsz, bsz], dim=0)
+            features = torch.cat([f1.unsqueeze(1), f2.unsqueeze(1), f3.unsqueeze(1), t_f1.unsqueeze(1), t_f2.unsqueeze(1), t_f3.unsqueeze(1)], dim=1)
+        else:
+            with torch.no_grad():
+                #logits_clean=logits
+                features = torch.cat([features.unsqueen(1), teacher_features.unsqueeze(1)], dim=1)
+
+        loss = self.criterion(features, labels)
+        #acc = accuracy(torch.argmax(logits_clean,1), labels)
+        #acc=0
+        stats = {"SupConLoss": loss,}
+                                                
+        return loss, stats
+

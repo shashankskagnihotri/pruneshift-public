@@ -5,10 +5,9 @@ loss:
   temperature: 0.07
   contrast_mode: 'all'
   base_temperature: 0.07
-  augmix: True
 
 datamodule:
-  augmix: True
+  augmix: False
 
 network:
   supConLoss: True

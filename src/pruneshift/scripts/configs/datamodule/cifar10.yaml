@@ -10,3 +10,10 @@ datamodule:
 network:
     num_classes: 10
     group: cifar
+
+trainer:
+    max_epochs: 100
+
+scheduler:
+    _target_: pruneshift.modules.cosine_lr
+    T_max: ${trainer.max_epochs}

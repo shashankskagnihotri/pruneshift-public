@@ -2,7 +2,7 @@
 import logging
 from pathlib import Path
 from typing import Union
-
+import torch
 from augmix.dataset import AugMixWrapper
 import pytorch_lightning as pl
 from torch.utils.data import DataLoader
@@ -17,6 +17,7 @@ from .datasets import ImageNetC
 from .datasets import TransformWrapper
 from .datasets import ImageFolderSubset
 from .datasets import CRDWrapper
+from .datasets import SplitImageFolder
 
 logger = logging.getLogger(__name__)
 
@@ -62,6 +63,8 @@ class ShiftDataModule(pl.LightningDataModule):
         with_normalize: bool = True,
         crd: bool = False,
         only_test_transform: bool = False,
+        val_split: float = 0.0,
+        deepaugment_entire: bool = True,
     ):
         super(ShiftDataModule, self).__init__()
         self.name = name
@@ -76,6 +79,8 @@ class ShiftDataModule(pl.LightningDataModule):
         self.test_renditions = test_renditions
         self.with_normalize = with_normalize
         self.only_test_transform = only_test_transform
+        self.val_split = val_split
+        self.deepaugment_entire = deepaugment_entire
 
         # Create the transformations corresponding to the dataset.
         self.train_transform = None
@@ -233,14 +238,28 @@ class ShiftDataModule(pl.LightningDataModule):
     def setup(self, stage):
         if stage == "fit":
             # 1. Create training dataset.
-            train_dataset = self.create_dataset(True)
+            #train_dataset = self.create_dataset(True)
+            entire_dataset = self.create_dataset(True)
 
-            # 2. Potentially add deepaugment samples.
-            if self.deepaugment_path is not None:
-                train_dataset = self.create_deepaugment_dataset(train_dataset)
+            if self.val_split>0:
+                if self.deepaugment_path is not None and self.deepaugment_entire:
+                    entire_dataset = self.create_deepaugment_dataset(entire_dataset)
+                val_len=int(len(entire_dataset)*self.val_split)
+                train_len=int(len(entire_dataset)-val_len)
+                split=[train_len, val_len]
+                train_dataset, val_dataset = torch.utils.data.random_split(entire_dataset, split)
+                if self.deepaugment_path is not None and not self.deepaugment_entire:
+                    val_dataset = self.create_deepaugment_dataset(val_dataset)
+            else:
+                train_dataset = entire_dataset
 
-            # 3. Here we potentially could split the dataset.
-            val_dataset = self.create_dataset(False)
+
+                # 2. Potentially add deepaugment samples.
+                if self.deepaugment_path is not None:
+                    train_dataset = self.create_deepaugment_dataset(train_dataset)
+
+                # 3. Here we potentially could split the dataset.
+                val_dataset = self.create_dataset(False)
 
             # 4. Add standard augmentation or augmix to the training set.
             deep_augment = False if self.deepaugment_path is None else True
