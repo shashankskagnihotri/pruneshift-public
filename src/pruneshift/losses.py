@@ -481,7 +481,7 @@ class SupCon(nn.Module):
     """Supervised Contrastive Learning: https://arxiv.org/pdf/2004.11362.pdf.
     It also supports the unsupervised contrastive loss in SimCLR"""
     def __init__(self, network: nn.Module, temperature=0.1, contrast_mode='all', augmix:bool=False,
-                 base_temperature=0.1, **kwargs):
+                 base_temperature=0.07, **kwargs):
         super(SupCon, self).__init__()
         self.network=network
         self.temperature = temperature
@@ -524,7 +524,7 @@ class KD_SupCon(nn.Module):
     """Supervised Contrastive Learning: https://arxiv.org/pdf/2004.11362.pdf.
     """
     def __init__(self, network: nn.Module, teacher: Teacher, temperature=0.1, contrast_mode='all', augmix:bool=False,
-            base_temperature=0.1, feat_dim:int=128, **kwargs):
+            base_temperature=0.07, feat_dim:int=128, **kwargs):
         super(KD_SupCon, self).__init__()
         self.network=network
         with torch.no_grad():

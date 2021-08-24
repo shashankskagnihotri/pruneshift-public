@@ -83,7 +83,11 @@ def create_network(
 
     if group == "cifar":
         if name[:6] == "resnet":
-            network_fn = getattr(models, name)
+            if scaling_factor==1.0:
+                network_fn = getattr(models, name)
+            else:
+                logger.info(f"Scaling the network {scaling_factor} times.")
+                network_fn =  partial(getattr(models, name), prune=scaling_factor)
         else:
             network_fn = getattr(models, name)
     elif group == "imagenet":
@@ -228,6 +232,10 @@ def _scalable_imagenet_models(name: str, scaling_factor: float):
     elif name == "mnasnet":
         return partial(imagenet_models.MNASNet, alpha=scaling_factor)
     elif name[:6] == "resnet":
+        return partial(getattr(scalable_resnet, name), scaling_factor=scaling_factor)
+    elif name[:7] == "resnext":
+        return partial(getattr(scalable_resnet, name), scaling_factor=scaling_factor)
+    elif name[:11] == "wide_resnet":
         return partial(getattr(scalable_resnet, name), scaling_factor=scaling_factor)
 
     raise NotImplementedError

@@ -195,7 +195,6 @@ class PrunedModule(VisionModule):
         self.print(f"\n {info.summary()}")
         self.print("The effective compression ratio is {}".format(info.network_comp()))
         self.print("The effective num of params is {}".format(info.network_size()))
-        import pdb;pdb.set_trace()
 
     def on_train_epoch_start(self):
         # Prune at start if wanted.
