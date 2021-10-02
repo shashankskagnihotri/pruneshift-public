@@ -1,0 +1,9 @@
+# @package _group_
+
+name: resnet34 
+download: True
+num_classes: ${network.num_classes}
+group: imagenet 
+imagenet_subset_path: ${datamodule.root}/train
+imagenet_path: ${path.imagenet1000}/train
+

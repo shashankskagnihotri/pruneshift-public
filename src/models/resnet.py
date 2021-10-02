@@ -166,20 +166,23 @@ class ResNet(nn.Module):
         layers: List[int],
         num_classes: int = 100,
         zero_init_residual: bool = False,
-        prune: float = 0,
+        prune: float = 1.0,
         groups: int = 1,
         dropout:float = 0.0,
         width_per_group: int = 64,
+        scale:float = 1.0,
         replace_stride_with_dilation: Optional[List[bool]] = None,
-        norm_layer: Optional[Callable[..., nn.Module]] = None
+        norm_layer: Optional[Callable[..., nn.Module]] = None,
+        **kwargs
     ) -> None:
         super(ResNet, self).__init__()
         if norm_layer is None:
             norm_layer = nn.BatchNorm2d
         self._norm_layer = norm_layer
         self.dropout = dropout
-        self.inplanes = 64
+        self.inplanes = int(64*prune)
         self.dilation = 1
+        self.scale=scale
         self.is_feat=False
         
         if replace_stride_with_dilation is None:
@@ -192,20 +195,20 @@ class ResNet(nn.Module):
         self.groups = groups
         self.prune = prune
         self.base_width = width_per_group
-        self.conv1 = nn.Conv2d(3, self.inplanes, kernel_size=3, stride=1, padding=1,
+        self.conv1 = nn.Conv2d(3, int(self.inplanes), kernel_size=3, stride=1, padding=1,
                                bias=False)
-        self.bn1 = norm_layer(self.inplanes)
+        self.bn1 = norm_layer(int(self.inplanes))
         self.relu = nn.ReLU(inplace=True)
         self.maxpool = nn.MaxPool2d(kernel_size=3, stride=1, padding=1)
-        self.layer1 = self._make_layer(block, int(64 * (1 - self.prune)), layers[0])
-        self.layer2 = self._make_layer(block, int(128 * (1 - self.prune)), layers[1], stride=2,
+        self.layer1 = self._make_layer(block, int(64 * (self.prune)), layers[0])
+        self.layer2 = self._make_layer(block, int(128 * (self.prune)), layers[1], stride=2,
                                        dilate=replace_stride_with_dilation[0])
-        self.layer3 = self._make_layer(block, int(256 * (1 - self.prune)), layers[2], stride=2,
+        self.layer3 = self._make_layer(block, int(256 * (self.prune)), layers[2], stride=2,
                                        dilate=replace_stride_with_dilation[1])
-        self.layer4 = self._make_layer(block, int(512 * (1 - self.prune)), layers[3], stride=2,
+        self.layer4 = self._make_layer(block, int(512 * (self.prune)), layers[3], stride=2,
                                        dilate=replace_stride_with_dilation[2])
         self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
-        self.fc = nn.Linear(int(512 * (1 - self.prune)) * block.expansion, num_classes)
+        self.fc = nn.Linear(int(512 * (self.prune)) * block.expansion, num_classes)
 
         for m in self.modules():
             if isinstance(m, nn.Conv2d):

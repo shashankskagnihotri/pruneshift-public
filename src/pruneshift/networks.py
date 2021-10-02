@@ -143,14 +143,18 @@ def create_network(
     #load network weights
     if path is not None and group != "dataset":
         if not testing:
+            #network=torch.load(path)
             safe_ckpt_load(network, path)
         else:
-            ckpt=torch.load(path)
+            ckpt=torch.load(path, map_location='cpu')
             state_dict=ckpt['model']
             new_state_dict={}
             for k, v in state_dict.items():
                 k=k.replace("module.","")
                 k=k.replace("shortcut", "downsample")
+                k=k.replace("encoder","features")
+                k=k.replace("head.0", "contrast")
+                k=k.replace("head.2", "projection")
                 new_state_dict[k]=v
             state_dict=new_state_dict
             network.load_state_dict(state_dict)
@@ -289,7 +293,7 @@ def create_teacher(
     if activations_path is not None:
         if imagenet_path is not None:
             logger.info(f"Adopting teacher database to {num_classes} classes.")
-            network = DatabaseNetwork(activations_path, 1000)
+            network = DatabaseNetwork(activations_path, num_classes)
             return ImagenetSubsetWrapper(
                 network, num_classes, imagenet_subset_path, imagenet_path
             )

@@ -1,0 +1,45 @@
+# @package _global_
+
+path:
+    logdir: /work/dlclarge2/agnihotr-shashank-pruneshift/debug_runs/${now:%Y-%m-%d}/${now:%H-%M-%S}
+    checkpoint: ${path.logdir}/model_ckpts/
+    dataset: /work/dlclarge2/agnihotr-shashank-pruneshift/hoffmaja-pruneshift/datasets
+    model: /work/dlclarge2/agnihotr-shashank-pruneshift/hoffmaja-pruneshift/models
+    imagenet100: ${path.dataset}/ILSVRC2012-100
+    imagenet200: null
+    imagenet1000: /data/datasets/ILSVRC2012
+    deepaugment: /data/datasets/DeepAugment
+    renditions: /data/datasets/ImageNet/imagenet-r
+
+hydra:
+    run:
+        dir: ${path.logdir}
+    sweep:
+        dir: ${path.logdir}
+        subdir: ${path.logdir}/${hydra.job.num}
+    # Settings for the hydra slurm launcher.
+    launcher:
+        submitit_folder: ${hydra.sweep.dir}/.submitit/
+        # How long should the run take at maximum.
+        # Set a really high timeout for the job, but often there is a limit.
+        timeout_min: 1420 
+        cpus_per_task: 64 
+        # gpus_per_node: 4 
+        tasks_per_node: 1
+        mem_gb: 80
+        nodes: 1
+        name: ${hydra.job.name}
+        _target_: hydra_plugins.hydra_submitit_launcher.submitit_launcher.SlurmLauncher
+        partition: alldlc_gpu-rtx2080
+        comment: null
+        constraint: null
+        exclude: null
+        # mem_per_gpu: "10GB"
+        # mem_per_cpu: 1000 
+        signal_delay_s: 120
+        max_num_timeout: 0
+        additional_parameters: {"gres": "gpu:8"} # {"nodelist": dlcgpu13}
+        # How many runs should be at maximum that run parallel?
+        array_parallelism: 12 
+        # Commands before exectuing the main script.
+        # setup: ["source /work/dlclarge2/hoffmaja-pruneshift/envs/pruneshift/bin/activate"]
