@@ -1,0 +1,7 @@
+# @package _group_
+
+name: resnet50
+ckpt_path: /work/dlclarge2/agnihotr-shashank-pruneshift/teachers/img100/amda_resnet50/checkpoint/last.ckpt
+#imagenet_subset_path: ${datamodule.root}/train
+num_classes: 100
+group: imagenet

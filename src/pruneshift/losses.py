@@ -4,6 +4,7 @@ from typing import Dict
 from collections import UserDict
 
 import torch
+import numpy
 import torch.nn as nn
 import torch.nn.functional as F
 from pytorch_lightning.metrics.functional import accuracy
