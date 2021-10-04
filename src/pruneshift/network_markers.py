@@ -2,7 +2,7 @@
 import torch.nn as nn
 import torchvision.models as tv_models
 import timm.models as timm_models
-import scalable_resnet
+import scalable_resnet 
 
 import models as custom_models
 from .teachers import Teacher
@@ -19,17 +19,17 @@ def _unwrap(network: nn.Module):
     return network
 
 
-def protect_classifier(network: nn.Module):
+def protect_classifier(network: nn.Module, ensemble: bool):
     """ Marks the classification layers as non prunable."""
     network = _unwrap(network)
 
     if isinstance(network, RESNET_CLASSES):
         network.conv1.is_protected = True
 
-    classifier(network).is_protected = True
+    classifier(network, ensemble).is_protected = True
 
 
-def classifier(network: nn.Module):
+def classifier(network: nn.Module, ensemble):
     """ Returns the classification layer of the resnet."""
     network = _unwrap(network)
 
@@ -39,6 +39,8 @@ def classifier(network: nn.Module):
         return network.classifier[-1]
     elif isinstance(network, tv_models.MobileNetV2):
         return network.classifier[-1]
+    elif ensemble:
+        return network.classifier
     else:
         #raise NotImplementedError
         network=network.network

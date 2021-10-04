@@ -1,6 +1,7 @@
 """ Bundles different kind of network create functions."""
 from functools import partial
 import re
+import copy
 from pathlib import Path
 from typing import Callable, Optional
 from typing import Optional
@@ -46,6 +47,7 @@ def create_network(
     supConLoss: bool = False,
     classifying:bool = False,
     testing : bool = False,
+    ensemble : bool = False,
     feat_dim:int =128,
     loading_final_supcon: bool = False,
     **kwargs,
@@ -114,12 +116,24 @@ def create_network(
         subset_wrap = True
         create_num_classes = 1000
 
-    network = network_fn(num_classes=create_num_classes, **kwargs)
-
+    #network = network_fn(num_classes=create_num_classes, **kwargs)
 
     # Protect classifier layers from pruning must come before
     # ckpt loading for hydra.
-    protect_classifier(network)
+    #protect_classifier(network)
+
+    if ensemble:
+        #net = network_fn(num_classes=create_num_classes, **kwargs)
+        net1 = imagenet_models.resnet18() 
+        net2 = imagenet_models.resnet18() 
+        net3 = imagenet_models.resnet18()
+        #network = Ensemble(copy.deepcopy(net), copy.deepcopy(net), copy.deepcopy(net))
+        network = Ensemble(net1, net2, net3)
+        #import pdb;pdb.set_trace()
+        protect_classifier(network, ensemble)
+    else:
+        network = network_fn(num_classes=create_num_classes, **kwargs)
+        protect_classifier(network, ensemble)
 
 
     # Add the projection head if using SupConLoss:
@@ -186,6 +200,30 @@ def create_network(
 
     return network
 
+class Ensemble(nn.Module):
+    def __init__(self, network_a, network_b, network_c):
+        super(Ensemble, self).__init__()
+        self.network1 = network_a
+        self.network2 = network_b
+        self.network3 = network_c
+        dim_in = self.network1.fc.in_features
+        dim_out = self.network1.fc.out_features
+        self.network1.fc=Identity()
+        self.network2.fc=Identity()
+        self.network3.fc=Identity()
+        self.classifier = torch.nn.Linear(dim_in*3, dim_out)
+
+    def forward(self, x):
+        x1 = self.network1(x.clone())
+        x1 = x1.view(x1.size(0), -1)
+        x2 = self.network2(x.clone())
+        x2 = x2.view(x2.size(0), -1)
+        x3 = self.network3(x.clone())
+        x3 = x3.view(x3.size(0), -1)
+        x = torch.cat((x1, x2, x3), dim=1)
+
+        x = self.classifier(F.relu(x))
+        return x
 
 class Identity(nn.Module):
     def __init__(self):
@@ -198,6 +236,13 @@ class Normalize(nn.Module):
         super(Normalize, self).__init__()
     def forward(self,x):
         return F.normalize(x)
+
+class Classify(nn.Module):
+    def __init__(self, dim_in, dim_out):
+        super(Classify, self).__init__()
+        self.classifier = torch.nn.Linear(dim_in*3, dim_out)
+    def forward(self,x):
+        return self.classifier(x)
 
 class ImagenetSubsetWrapper(nn.Module):
     """Changes predictions for models trained on imagenet to a subset."""
