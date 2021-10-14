@@ -38,7 +38,7 @@ hydra:
         # mem_per_cpu: 1000 
         signal_delay_s: 120
         max_num_timeout: 0
-        additional_parameters: {"gres": "gpu:4"} # {"nodelist": dlcgpu13}
+        additional_parameters: {"gres": "gpu:4", "nodelist": "dlcgpu41"}
         # How many runs should be at maximum that run parallel?
         array_parallelism: 12 
         # Commands before exectuing the main script.

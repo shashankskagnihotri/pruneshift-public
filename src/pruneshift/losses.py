@@ -3,6 +3,7 @@ import logging
 from typing import Dict
 from collections import UserDict
 
+import pandas
 import torch
 import numpy
 import torch.nn as nn
@@ -62,6 +63,26 @@ class StandardLoss(nn.Module):
         super(StandardLoss, self).__init__()
         self.network = network
         self.supCon = supCon
+        #lists1=[]
+        #lists2=[]
+        #total_mask=0
+        #non_zero=0
+        #for a, p in self.network.named_buffers():
+            #if 'weight_mask' in a:
+                #a_copy=p.detach().cpu().numpy()
+                #total_mask+=len(a_copy.flatten())
+                #non_zero+=numpy.count_nonzero(a_copy)
+                #lists1.append(a)
+                #lists2.append(numpy.count_nonzero(a_copy)/(p.shape[1]*p.shape[2]*p.shape[3]))
+                #torch.save(p, a+'.pt')
+                #print(p.shape)
+                #import ipdb; ipdb.set_trace()
+        #print("\n\nNumber of parameters: ", 
+                #(sum(p.numel() for p in self.network.parameters() 
+                    #if p.requires_grad)-total_mask+non_zero))
+        #df=pandas.DataFrame(data={"Layer": lists1, "mask":lists2})
+        #df.to_csv("./file.csv", sep=',',index=False)
+
 
     def forward(self, batch):
         _, x, y = batch

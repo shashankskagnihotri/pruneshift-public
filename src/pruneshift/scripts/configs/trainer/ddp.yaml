@@ -4,5 +4,6 @@ _target_: pytorch_lightning.Trainer
 gpus: -1
 benchmark: True
 accelerator: "ddp"
+num_nodes: 1
 sync_batchnorm: True
 

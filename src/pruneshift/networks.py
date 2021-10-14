@@ -49,6 +49,9 @@ def create_network(
     testing : bool = False,
     ensemble : bool = False,
     feat_dim:int =128,
+    network1_path: str = "/work/dlclarge1/agnihotr-ensemble/train_emsemble/imagenet100/amda/network1/checkpoint/last.ckpt",
+    network2_path: str = "/work/dlclarge1/agnihotr-ensemble/train_emsemble/imagenet100/amda/network2/checkpoint/last.ckpt",
+    network3_path: str = "/work/dlclarge1/agnihotr-ensemble/train_emsemble/imagenet100/amda/network3/checkpoint/last.ckpt",
     loading_final_supcon: bool = False,
     **kwargs,
 ):
@@ -116,24 +119,36 @@ def create_network(
         subset_wrap = True
         create_num_classes = 1000
 
-    #network = network_fn(num_classes=create_num_classes, **kwargs)
+    network = network_fn(num_classes=create_num_classes, **kwargs)
 
     # Protect classifier layers from pruning must come before
     # ckpt loading for hydra.
-    #protect_classifier(network)
+    protect_classifier(network,ensemble)
 
     if ensemble:
         #net = network_fn(num_classes=create_num_classes, **kwargs)
+        del network
         net1 = imagenet_models.resnet18() 
         net2 = imagenet_models.resnet18() 
         net3 = imagenet_models.resnet18()
+        dim_in = net1.fc.in_features
+        dim_out = create_num_classes
+        net1.fc =  torch.nn.Linear(dim_in, dim_out)
+        net2.fc =  torch.nn.Linear(dim_in, dim_out)
+        net3.fc =  torch.nn.Linear(dim_in, dim_out)
+        safe_ckpt_load(net1, network1_path)
+        safe_ckpt_load(net2, network2_path)
+        safe_ckpt_load(net3, network3_path)
+        protect_classifier(net1, False)
+        protect_classifier(net2, False)
+        protect_classifier(net3, False)
         #network = Ensemble(copy.deepcopy(net), copy.deepcopy(net), copy.deepcopy(net))
         network = Ensemble(net1, net2, net3)
         #import pdb;pdb.set_trace()
-        protect_classifier(network, ensemble)
-    else:
-        network = network_fn(num_classes=create_num_classes, **kwargs)
-        protect_classifier(network, ensemble)
+        #protect_classifier(network, ensemble)
+    #else:
+        #network = network_fn(num_classes=create_num_classes, **kwargs)
+        #protect_classifier(network, ensemble)
 
 
     # Add the projection head if using SupConLoss:
@@ -155,7 +170,7 @@ def create_network(
         network = torch.nn.Sequential(layers)
 
     #load network weights
-    if path is not None and group != "dataset":
+    if path is not None and group != "dataset" and not ensemble:
         if not testing:
             #network=torch.load(path)
             safe_ckpt_load(network, path)
@@ -206,24 +221,25 @@ class Ensemble(nn.Module):
         self.network1 = network_a
         self.network2 = network_b
         self.network3 = network_c
-        dim_in = self.network1.fc.in_features
-        dim_out = self.network1.fc.out_features
-        self.network1.fc=Identity()
-        self.network2.fc=Identity()
-        self.network3.fc=Identity()
-        self.classifier = torch.nn.Linear(dim_in*3, dim_out)
+        #dim_in = self.network1.fc.in_features
+        #dim_out = self.network1.fc.out_features
+        #self.network1.fc=Identity()
+        #self.network2.fc=Identity()
+        #self.network3.fc=Identity()
+        #self.classifier = torch.nn.Linear(dim_in*3, dim_out)
 
     def forward(self, x):
         x1 = self.network1(x.clone())
-        x1 = x1.view(x1.size(0), -1)
+        #x1 = x1.view(x1.size(0), -1)
         x2 = self.network2(x.clone())
-        x2 = x2.view(x2.size(0), -1)
+        #x2 = x2.view(x2.size(0), -1)
         x3 = self.network3(x.clone())
-        x3 = x3.view(x3.size(0), -1)
-        x = torch.cat((x1, x2, x3), dim=1)
+        #x3 = x3.view(x3.size(0), -1)
+        #x = torch.cat((x1, x2, x3), dim=1)
 
-        x = self.classifier(F.relu(x))
-        return x
+        #x = self.classifier(F.relu(x))
+        x4 = (x1+x2+x3)/3
+        return x4
 
 class Identity(nn.Module):
     def __init__(self):

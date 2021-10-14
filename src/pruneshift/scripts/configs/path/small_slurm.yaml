@@ -23,10 +23,10 @@ hydra:
         # How long should the run take at maximum.
         # Set a really high timeout for the job, but often there is a limit.
         timeout_min: 1420 
-        cpus_per_task: 64 
+        cpus_per_task: 16
         # gpus_per_node: 4 
         tasks_per_node: 1
-        mem_gb: 200
+        mem_gb: 100
         nodes: 1
         name: ${hydra.job.name}
         _target_: hydra_plugins.hydra_submitit_launcher.submitit_launcher.SlurmLauncher
@@ -38,8 +38,9 @@ hydra:
         # mem_per_cpu: 1000 
         signal_delay_s: 120
         max_num_timeout: 0
-        additional_parameters: {"gres": "gpu:8", "nodelist": "dlcgpu39"}
+        additional_parameters: {"gres": "gpu:2", "nodelist":"dlcgpu11"} 
+        #nodes: "dlcgpu04"
         # How many runs should be at maximum that run parallel?
-        array_parallelism: 12 
+        array_parallelism: 20 
         # Commands before exectuing the main script.
         # setup: ["source /work/dlclarge2/hoffmaja-pruneshift/envs/pruneshift/bin/activate"]
