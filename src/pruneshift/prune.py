@@ -5,7 +5,7 @@ import math
 import torch
 from torch import nn as nn
 from torch.nn.utils import prune as prune_torch
-
+import numpy as np
 
 from .prune_info import PruneInfo
 
@@ -104,6 +104,9 @@ def prune(
     elif method == "l1_channels":
         pruning_cls = partial(prune_torch.ln_structured, n=1, dim=0)
         layerwise = True
+    elif method == "l1_global":
+        pruning_cls = partial(prune_torch.ln_structured, n=1, dim=0)
+        layerwise = False
     elif method == "random_channels":
         pruning_cls = partial(prune_torch.random_structured, dim=0) 
         layerwise = True 
@@ -117,11 +120,22 @@ def prune(
         raise ValueError(f"Unknown pruning method: {method}")
 
     prune_info = PruneInfo(network)
+    threshold=0.0
+    
+    amount = prune_info.ratio_to_amount(ratio)
+
+    if method=="l1_global":
+        weights = np.array(1,)
+        for m in network.modules():
+            if isinstance(m, nn.Conv2d):
+                w = m.weight.data.abs().detach().cpu().numpy().flatten()
+                weights = np.hstack([weights, w])
+        weights=np.sort(weights)
+        threshold=weights[int(amount*len(weights))]
 
     # Calculate the amount that needs to pruned, to reach the 
     # target size.
-    amount = prune_info.ratio_to_amount(ratio)
-    simple_prune(prune_info, pruning_cls, layerwise, amount=amount)
+    simple_prune(prune_info, pruning_cls, layerwise, method=method, threshold=threshold, amount=amount)
 
     if shuffle:
         shuffle_masks(prune_info)
@@ -146,12 +160,24 @@ def simple_prune(
     prune_info: PruneInfo,
     pruning_method: Union[Callable, Type[prune_torch.BasePruningMethod]],
     layerwise: bool = False,
+    method: str = "l1_global",
+    threshold: float = 0.0,
     **kwargs,
 ):
     pairs = list(prune_info.target_pairs())
 
-    if not layerwise:
+    if method=="l1_global":#isinstance(prune_method, prune_torch.LnStructured) and not layerwise:
+        for submodule, param_name in pairs:
+            weight=submodule.weight.data.abs().detach().cpu().numpy().flatten()
+            amt=((weight<threshold).sum())/len(weight)
+            pruning_method(submodule, param_name, amount=amt)
+    elif not layerwise:
         prune_torch.global_unstructured(pairs, pruning_method, **kwargs)
+    elif isinstance(prune_method, prune_torch.LnStructured) and not layerwise:
+        for submodule, param_name in pairs:
+            weight=submodule.weight.data.abs().detach().cpu().numpy().flatten()
+            amt=((weight<threshold).sum())/len(weight)
+            pruning_method(submodule, param_name, amount=amt)
     else:
         for submodule, param_name in pairs:
             if not hasattr(pruning_method, "apply"):

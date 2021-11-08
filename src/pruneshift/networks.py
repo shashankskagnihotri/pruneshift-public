@@ -49,6 +49,7 @@ def create_network(
     testing : bool = False,
     ensemble : bool = False,
     feat_dim:int =128,
+    multiheaded: bool = False,
     network1_path: str = "/work/dlclarge1/agnihotr-ensemble/train_emsemble/imagenet100/amda/network1/checkpoint/last.ckpt",
     network2_path: str = "/work/dlclarge1/agnihotr-ensemble/train_emsemble/imagenet100/amda/network2/checkpoint/last.ckpt",
     network3_path: str = "/work/dlclarge1/agnihotr-ensemble/train_emsemble/imagenet100/amda/network3/checkpoint/last.ckpt",
@@ -136,9 +137,9 @@ def create_network(
         net1.fc =  torch.nn.Linear(dim_in, dim_out)
         net2.fc =  torch.nn.Linear(dim_in, dim_out)
         net3.fc =  torch.nn.Linear(dim_in, dim_out)
-        safe_ckpt_load(net1, network1_path)
-        safe_ckpt_load(net2, network2_path)
-        safe_ckpt_load(net3, network3_path)
+        #safe_ckpt_load(net1, network1_path)
+        #safe_ckpt_load(net2, network2_path)
+        #safe_ckpt_load(net3, network3_path)
         protect_classifier(net1, False)
         protect_classifier(net2, False)
         protect_classifier(net3, False)
@@ -152,6 +153,40 @@ def create_network(
 
 
     # Add the projection head if using SupConLoss:
+
+    if multiheaded:
+        #import ipdb;ipdb.set_trace()
+        del network
+        net=imagenet_models.resnet18()
+        net1=imagenet_models.resnet18()
+        net2=imagenet_models.resnet18()
+        net3=imagenet_models.resnet18()
+        dim_in = net1.fc.in_features
+        dim_out = create_num_classes
+        net1.fc =  torch.nn.Linear(dim_in, dim_out)
+        net2.fc =  torch.nn.Linear(dim_in, dim_out)
+        net3.fc =  torch.nn.Linear(dim_in, dim_out)
+        protect_classifier(net, False)
+        protect_classifier(net1, False)
+        protect_classifier(net2, False)
+        protect_classifier(net3, False)
+        
+
+        net_layers=OrderedDict([("conv1", net.conv1), ("bn1", net.bn1), ("relu", net.relu), ("maxpool", net.maxpool), ("layer1", net.layer1), ("layer2", net.layer2), ("layer3", net.layer3)])
+        net=torch.nn.Sequential(net_layers)
+        
+        net1_layers=OrderedDict([("layer4", net1.layer4), ("avgpool", net1.avgpool), ("fc", net1.fc)])
+        net2_layers=OrderedDict([("layer4", net2.layer4), ("avgpool", net2.avgpool), ("fc", net2.fc)])
+        net3_layers=OrderedDict([("layer4", net3.layer4), ("avgpool", net3.avgpool), ("fc", net3.fc)])
+        net1=torch.nn.Sequential(net1_layers)
+        net2=torch.nn.Sequential(net2_layers)
+        net3=torch.nn.Sequential(net3_layers)
+
+        layers=OrderedDict([("low", net), ("head1", net1), ("head2", net2), ("head3", net3)])
+        network=MultiHead(torch.nn.Sequential(layers))
+        #network=MultiHead(layers)
+
+
     if supConLoss:
         if name[:6]=="resnet":
             dim_in=network.fc.in_features
@@ -171,9 +206,23 @@ def create_network(
 
     #load network weights
     if path is not None and group != "dataset" and not ensemble:
-        if not testing:
+        if not testing and not multiheaded:
             #network=torch.load(path)
             safe_ckpt_load(network, path)
+        elif not testing and multiheaded:
+            ckpt=torch.load(path, map_location='cpu')
+            #import ipdb;ipdb.set_trace()
+            state_dict=ckpt['state_dict']
+            new_state_dict={}
+            #for k, v in state_dict.items():
+            #    k=k.replace("low.","network.low.")
+            #    k=k.replace("head1.","network.head1.")
+            #    k=k.replace("head2.","network.head2.")
+            #    k=k.replace("head3.","network.head3.")
+            #    new_state_dict[k]=v
+            #state_dict=new_state_dict
+            network.load_state_dict(state_dict)
+
         else:
             ckpt=torch.load(path, map_location='cpu')
             state_dict=ckpt['model']
@@ -214,6 +263,25 @@ def create_network(
     )
 
     return network
+
+class MultiHead(nn.Module):
+    def __init__(self, network):
+        super(MultiHead, self).__init__()
+        self.network=network
+    def forward(self, x):
+        x0 = self.network.low(x)
+        #import ipdb;ipdb.set_trace()
+        x1 = self.network.head1.layer4(x0.clone()) 
+        x1 = self.network.head1.avgpool(x1)
+        x1 = self.network.head1.fc(torch.flatten(x1, 1))
+        x2 = self.network.head2.fc(torch.flatten(self.network.head2.avgpool(self.network.head2.layer4(x0.clone())),1))
+        x3 = self.network.head3.fc(torch.flatten(self.network.head3.avgpool(self.network.head3.layer4(x0.clone())), 1))
+        x4 = (x1+x2+x3)/3
+
+        #if self.network.training():
+        return x1,x2,x3,x4
+        #else:
+        #return x4
 
 class Ensemble(nn.Module):
     def __init__(self, network_a, network_b, network_c):

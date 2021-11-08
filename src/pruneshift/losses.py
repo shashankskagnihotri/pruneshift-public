@@ -59,27 +59,29 @@ class DistillKL(nn.Module):
 
 
 class StandardLoss(nn.Module):
-    def __init__(self, network: nn.Module, datamodule=None, supCon: bool= False):
+    def __init__(self, network: nn.Module, datamodule=None, supCon: bool= False, multiheaded: bool= False):
         super(StandardLoss, self).__init__()
         self.network = network
         self.supCon = supCon
+        self.multiheaded= True
+        #self.multiheaded= False
         #lists1=[]
         #lists2=[]
-        #total_mask=0
-        #non_zero=0
-        #for a, p in self.network.named_buffers():
-            #if 'weight_mask' in a:
-                #a_copy=p.detach().cpu().numpy()
-                #total_mask+=len(a_copy.flatten())
-                #non_zero+=numpy.count_nonzero(a_copy)
+        total_mask=0
+        non_zero=0
+        for a, p in self.network.named_buffers():
+            if 'weight_mask' in a:
+                a_copy=p.detach().cpu().numpy()
+                total_mask+=len(a_copy.flatten())
+                non_zero+=numpy.count_nonzero(a_copy)
                 #lists1.append(a)
                 #lists2.append(numpy.count_nonzero(a_copy)/(p.shape[1]*p.shape[2]*p.shape[3]))
                 #torch.save(p, a+'.pt')
                 #print(p.shape)
                 #import ipdb; ipdb.set_trace()
-        #print("\n\nNumber of parameters: ", 
-                #(sum(p.numel() for p in self.network.parameters() 
-                    #if p.requires_grad)-total_mask+non_zero))
+        print("\n\nNumber of parameters: ", 
+                (sum(p.numel() for p in self.network.parameters() 
+                    if p.requires_grad)-total_mask+non_zero))
         #df=pandas.DataFrame(data={"Layer": lists1, "mask":lists2})
         #df.to_csv("./file.csv", sep=',',index=False)
 
@@ -91,6 +93,16 @@ class StandardLoss(nn.Module):
             with torch.no_grad():
                 features=self.network.encoder(x)
             logits=self.network.classifier(features)
+        elif self.multiheaded:
+            logits1, logits2, logits3, logits = self.network(x)
+            loss1 = F.cross_entropy(logits1, y)
+            loss2 = F.cross_entropy(logits2, y)
+            loss3 = F.cross_entropy(logits3, y)
+            if self.network.training:
+                loss1.backward(retain_graph=True)
+                loss2.backward(retain_graph=True)
+                loss3.backward(retain_graph=True)
+
         else:
             logits=self.network(x)
         loss=F.cross_entropy(logits,y)
@@ -107,7 +119,8 @@ class AugmixLoss(nn.Module):
             network: nn.Module,
             datamodule,
             augmix_alpha: float = 12.0,
-            supCon: bool = False
+            supCon: bool = False,
+            multiheaded: bool = False
     ):
         """Implements the AugmixLoss from the augmix paper.
 
@@ -118,6 +131,8 @@ class AugmixLoss(nn.Module):
         self.network = network
         self.augmix_alpha = augmix_alpha
         self.supCon = supCon
+        self.multiheaded = True
+        #self.multiheaded = False
 
     def forward(self, batch):
         idx, x, y = batch
@@ -129,6 +144,15 @@ class AugmixLoss(nn.Module):
             with torch.no_grad():
                 features = self.network.encoder(torch.cat(x))
             logits=self.network.classifier(features)
+        elif self.multiheaded:
+            logits1, logits2, logits3, logits = self.network(torch.cat(x))
+            loss1 = F.cross_entropy(torch.split(logits1, len(logits1)//3)[0], y)
+            loss2 = F.cross_entropy(torch.split(logits2, len(logits2)//3)[0], y)
+            loss3 = F.cross_entropy(torch.split(logits3, len(logits3)//3)[0], y)
+            if self.network.training:
+                loss1.backward(retain_graph=True)
+                loss2.backward(retain_graph=True)
+                loss3.backward(retain_graph=True)
         else:
             logits = self.network(torch.cat(x))
         logits = torch.split(logits, len(logits) // 3)

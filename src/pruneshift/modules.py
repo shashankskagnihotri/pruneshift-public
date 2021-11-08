@@ -65,6 +65,7 @@ class VisionModule(pl.LightningModule):
         train_loss: nn.Module = None,
         optimizer_fn=optim.Adam,
         scheduler_fn=None,
+        multiheaded: bool = False
     ):
 
         super(VisionModule, self).__init__()
@@ -74,6 +75,8 @@ class VisionModule(pl.LightningModule):
         self.val_loss = StandardLoss(network)
         self.optimizer_fn = optimizer_fn
         self.scheduler_fn = scheduler_fn
+        #self.multiheaded = multiheaded
+        self.multiheaded = True
 
         # Prepare the metrics.
         self.test_labels = [f"acc_{l}" for l in self.datamodule.labels]
@@ -124,7 +127,10 @@ class VisionModule(pl.LightningModule):
 
     def test_step(self, batch, batch_idx, dataset_idx=0):
         _, x, y = batch
-        self.test_acc[self.test_labels[dataset_idx]](y, torch.argmax(self(x), -1))
+        if self.multiheaded:
+            self.test_acc[self.test_labels[dataset_idx]](y, torch.argmax(self(x)[-1], -1))
+        else:
+            self.test_acc[self.test_labels[dataset_idx]](y, torch.argmax(self(x), -1))
 
     def test_epoch_end(self, outputs):
         values = {}
@@ -145,6 +151,13 @@ class VisionModule(pl.LightningModule):
         if self.optimizer_fn is None:
             return
 
+        #self.multiheaded=True
+        #import pdb;pdb.set_trace()
+        #print("Multiheaded: ", self.multiheaded)
+        #if self.multiheaded:
+        #    import pdb;pdb.set_trace()
+        #    optimizer= optim.Adam(list(self.network.parameters()), lr=0.1)
+        #else:
         optimizer = self.optimizer_fn(self.parameters())
 
         if self.scheduler_fn is None:
