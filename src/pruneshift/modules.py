@@ -21,7 +21,9 @@ from .prune_hydra import hydrate
 from .prune_hydra import dehydrate
 from .prune_hydra import is_hydrated
 from .prune_info import PruneInfo
+from sklearn.calibration import CalibratedClassifierCV
 
+from pruneshift.calibrate import Calibration as calibrate
 
 logger = logging.getLogger(__name__)
 CORRUPTION_REGEX = re.compile(r"test_acc_[a-z_]+_[0-9]")
@@ -75,12 +77,16 @@ class VisionModule(pl.LightningModule):
         self.val_loss = StandardLoss(network)
         self.optimizer_fn = optimizer_fn
         self.scheduler_fn = scheduler_fn
-        #self.multiheaded = multiheaded
-        self.multiheaded = True
+        self.multiheaded = multiheaded
+        #self.multiheaded = True
 
         # Prepare the metrics.
         self.test_labels = [f"acc_{l}" for l in self.datamodule.labels]
         self.test_acc = nn.ModuleDict({l: Accuracy() for l in self.test_labels})
+
+        self.calibrator = calibrate(self.network)
+        #self.calibrate_model = True
+        self.calibrate_model = False
 
     # @rank_zero_only
     def model_stats(self):
@@ -111,6 +117,8 @@ class VisionModule(pl.LightningModule):
 
     def validation_step(self, batch, batch_idx):
         loss, stats = self.val_loss(batch)
+        if self.calibrate_model:
+            self.calibrator(batch[1], batch[2])
         acc = stats["acc"]
 
         self.log(
@@ -202,12 +210,19 @@ class PrunedModule(VisionModule):
         self.prune_fn = prune_fn
         self.prune_interval = prune_interval
         self.prune_at_start = prune_at_start
+        #self.ensemble_sep = True
+        self.ensemble_sep = False
 
     def prune(self):
         info = self.prune_fn(self.network)
         self.print(f"\n {info.summary()}")
         self.print("The effective compression ratio is {}".format(info.network_comp()))
         self.print("The effective num of params is {}".format(info.network_size()))
+        if self.ensemble_sep:
+            torch.save(self.network.network1.state_dict(), 'network1.pth')
+            torch.save(self.network.network2.state_dict(), 'network2.pth')
+            torch.save(self.network.network3.state_dict(), 'network3.pth')
+
 
     def on_train_epoch_start(self):
         # Prune at start if wanted.

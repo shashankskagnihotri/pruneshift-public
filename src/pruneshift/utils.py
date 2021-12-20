@@ -40,7 +40,8 @@ def safe_ckpt_load(network: nn.Module, path: Union[str, Path]):
 
 def load_state_dict(network, path: Union[str, Path]):
     """ Loads a state_dict """
-    state_dict = torch.load(path, map_location=lambda storage, loc: storage)
+    #state_dict = torch.load(path, map_location=lambda storage, loc: storage)
+    state_dict = torch.load(path, map_location='cpu')
 
     if "state_dict" not in state_dict:
         return state_dict

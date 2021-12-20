@@ -173,7 +173,7 @@ def simple_prune(
             pruning_method(submodule, param_name, amount=amt)
     elif not layerwise:
         prune_torch.global_unstructured(pairs, pruning_method, **kwargs)
-    elif isinstance(prune_method, prune_torch.LnStructured) and not layerwise:
+    elif isinstance(pruning_method, prune_torch.LnStructured) and not layerwise:
         for submodule, param_name in pairs:
             weight=submodule.weight.data.abs().detach().cpu().numpy().flatten()
             amt=((weight<threshold).sum())/len(weight)

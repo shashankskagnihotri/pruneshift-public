@@ -25,7 +25,7 @@ from .network_markers import protect_classifier
 import cifar10_models as cifar_models
 import scalable_resnet
 import models as models
-
+import torch.nn.utils.prune as torch_prune
 
 logger = logging.getLogger(__name__)
 
@@ -48,12 +48,14 @@ def create_network(
     classifying:bool = False,
     testing : bool = False,
     ensemble : bool = False,
+    loading_ensemble : bool = False,
     feat_dim:int =128,
     multiheaded: bool = False,
-    network1_path: str = "/work/dlclarge1/agnihotr-ensemble/train_emsemble/imagenet100/amda/network1/checkpoint/last.ckpt",
-    network2_path: str = "/work/dlclarge1/agnihotr-ensemble/train_emsemble/imagenet100/amda/network2/checkpoint/last.ckpt",
-    network3_path: str = "/work/dlclarge1/agnihotr-ensemble/train_emsemble/imagenet100/amda/network3/checkpoint/last.ckpt",
+    network1_path: str = "/work/dlclarge1/agnihotr-ensemble/train_emsemble/imagenet100/standard/network1/checkpoint/last.ckpt",
+    network2_path: str = "/work/dlclarge1/agnihotr-ensemble/train_emsemble/imagenet100/standard/network2/checkpoint/last.ckpt",
+    network3_path: str = "/work/dlclarge1/agnihotr-ensemble/train_emsemble/imagenet100/standard/network3/checkpoint/last.ckpt",
     loading_final_supcon: bool = False,
+    randomize_weights: bool = False,
     **kwargs,
 ):
     """A function creating networks.
@@ -126,6 +128,9 @@ def create_network(
     # ckpt loading for hydra.
     protect_classifier(network,ensemble)
 
+    if randomize_weights:
+        network.apply(randomize)
+
     if ensemble:
         #net = network_fn(num_classes=create_num_classes, **kwargs)
         del network
@@ -137,9 +142,9 @@ def create_network(
         net1.fc =  torch.nn.Linear(dim_in, dim_out)
         net2.fc =  torch.nn.Linear(dim_in, dim_out)
         net3.fc =  torch.nn.Linear(dim_in, dim_out)
-        #safe_ckpt_load(net1, network1_path)
-        #safe_ckpt_load(net2, network2_path)
-        #safe_ckpt_load(net3, network3_path)
+        safe_ckpt_load(net1, network1_path)
+        safe_ckpt_load(net2, network2_path)
+        safe_ckpt_load(net3, network3_path)
         protect_classifier(net1, False)
         protect_classifier(net2, False)
         protect_classifier(net3, False)
@@ -205,23 +210,37 @@ def create_network(
         network = torch.nn.Sequential(layers)
 
     #load network weights
-    if path is not None and group != "dataset" and not ensemble:
+    if path is not None and group != "dataset" and loading_ensemble and ensemble:
+        #ckpt=torch.load(path, map_location='cpu')
+        #state_dict=ckpt['state_dict']
+        #network.load_state_dict(state_dict)
+        safe_ckpt_load(network, path)
+    elif path is not None and group != "dataset" and not ensemble:
         if not testing and not multiheaded:
             #network=torch.load(path)
             safe_ckpt_load(network, path)
         elif not testing and multiheaded:
             ckpt=torch.load(path, map_location='cpu')
-            #import ipdb;ipdb.set_trace()
             state_dict=ckpt['state_dict']
-            new_state_dict={}
-            #for k, v in state_dict.items():
-            #    k=k.replace("low.","network.low.")
-            #    k=k.replace("head1.","network.head1.")
-            #    k=k.replace("head2.","network.head2.")
-            #    k=k.replace("head3.","network.head3.")
-            #    new_state_dict[k]=v
-            #state_dict=new_state_dict
+            pruned=False
+            for param_name in state_dict:
+                if param_name[-4:]=="mask":
+                    pruned=True
+            if pruned:
+                for param_name, param in list(network.named_parameters()):
+                    if param_name + "_orig" in state_dict:
+                        idx = param_name.rfind(".")
+                        module_name, param_name = param_name[:idx], param_name[idx + 1 :]
+                        module = network
+                        for submodule_name in module_name.split("."):
+                            module = getattr(module, submodule_name)
+                        # Prune with identity so we can load into the pruning sheme.
+                        torch_prune.identity(module, param_name)
+
+                    elif not param_name in state_dict:
+                        raise ValueError(f"Missing {param_name}.")
             network.load_state_dict(state_dict)
+            #safe_ckpt_load(network, path)
 
         else:
             ckpt=torch.load(path, map_location='cpu')
@@ -401,6 +420,10 @@ def _resolve_path(
         return Path(model_path) / f"{group}{num_classes}_{name}.{version}"
 
     return None
+
+def randomize(m):
+    if isinstance(m, nn.Conv2d):
+        torch.nn.init.normal_(m.weight)
 
 
 def create_teacher(
