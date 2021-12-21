@@ -142,9 +142,12 @@ def create_network(
         net1.fc =  torch.nn.Linear(dim_in, dim_out)
         net2.fc =  torch.nn.Linear(dim_in, dim_out)
         net3.fc =  torch.nn.Linear(dim_in, dim_out)
-        safe_ckpt_load(net1, network1_path)
-        safe_ckpt_load(net2, network2_path)
-        safe_ckpt_load(net3, network3_path)
+        if network1_path is not None:
+            safe_ckpt_load(net1, network1_path)
+        if network2_path is not None:
+            safe_ckpt_load(net2, network2_path)
+        if network3_path is not None:
+            safe_ckpt_load(net3, network3_path)
         protect_classifier(net1, False)
         protect_classifier(net2, False)
         protect_classifier(net3, False)

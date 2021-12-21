@@ -85,8 +85,8 @@ class VisionModule(pl.LightningModule):
         self.test_acc = nn.ModuleDict({l: Accuracy() for l in self.test_labels})
 
         self.calibrator = calibrate(self.network)
-        #self.calibrate_model = True
-        self.calibrate_model = False
+        self.calibrate_model = True
+        #self.calibrate_model = False
 
     # @rank_zero_only
     def model_stats(self):
