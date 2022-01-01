@@ -126,7 +126,8 @@ def create_network(
 
     # Protect classifier layers from pruning must come before
     # ckpt loading for hydra.
-    protect_classifier(network,ensemble)
+    if name != 'alexnet':
+        protect_classifier(network,ensemble)
 
     if randomize_weights:
         network.apply(randomize)
