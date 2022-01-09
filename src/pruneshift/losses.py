@@ -63,8 +63,8 @@ class StandardLoss(nn.Module):
         super(StandardLoss, self).__init__()
         self.network = network
         self.supCon = supCon
-        #self.multiheaded= True
-        self.multiheaded= False
+        self.multiheaded= True
+        #self.multiheaded= False 
         total_mask=0
         non_zero=0
         for a, p in self.network.named_buffers():
@@ -122,8 +122,8 @@ class AugmixLoss(nn.Module):
         self.network = network
         self.augmix_alpha = augmix_alpha
         self.supCon = supCon
-        #self.multiheaded = True
-        self.multiheaded = False
+        self.multiheaded = True 
+        #self.multiheaded = False
 
     def forward(self, batch):
         idx, x, y = batch

@@ -26,6 +26,7 @@ import cifar10_models as cifar_models
 import scalable_resnet
 import models as models
 import torch.nn.utils.prune as torch_prune
+import cifar_resnet as cifar
 
 logger = logging.getLogger(__name__)
 
@@ -129,15 +130,26 @@ def create_network(
     if name != 'alexnet':
         protect_classifier(network,ensemble)
 
+    if name=='alexnet':
+        del network
+        network=imagenet_models.alexnet(pretrained=True)
+        network.classifier = nn.Sequential(*list(network.classifier.children())[:-1], nn.Linear(4096, num_classes))
+        print('using pretrained alexnet')
+
     if randomize_weights:
         network.apply(randomize)
 
     if ensemble:
         #net = network_fn(num_classes=create_num_classes, **kwargs)
         del network
-        net1 = imagenet_models.resnet18() 
-        net2 = imagenet_models.resnet18() 
-        net3 = imagenet_models.resnet18()
+        if group == "imagenet":
+            net1 = imagenet_models.resnet18() 
+            net2 = imagenet_models.resnet18() 
+            net3 = imagenet_models.resnet18()
+        elif group =="cifar":
+            net1 = cifar.resnet18()
+            net2 = cifar.resnet18()
+            net3 = cifar.resnet18()
         dim_in = net1.fc.in_features
         dim_out = create_num_classes
         net1.fc =  torch.nn.Linear(dim_in, dim_out)
@@ -165,11 +177,19 @@ def create_network(
 
     if multiheaded:
         #import ipdb;ipdb.set_trace()
+        if group == "imagenet":
+            net=imagenet_models.resnet18()
+            net1=imagenet_models.resnet18()
+            net2=imagenet_models.resnet18()
+            net3=imagenet_models.resnet18()
+        elif group == "cifar":
+            print("making cifar networks.....")
+            net=cifar.resnet18()
+            net1=cifar.resnet18()
+            net2=cifar.resnet18()
+            net3=cifar.resnet18()
+
         del network
-        net=imagenet_models.resnet18()
-        net1=imagenet_models.resnet18()
-        net2=imagenet_models.resnet18()
-        net3=imagenet_models.resnet18()
         dim_in = net1.fc.in_features
         dim_out = create_num_classes
         net1.fc =  torch.nn.Linear(dim_in, dim_out)
@@ -292,6 +312,8 @@ class MultiHead(nn.Module):
         super(MultiHead, self).__init__()
         self.network=network
     def forward(self, x):
+        #print('x_class in network: ', x.__class__)
+        #import ipdb;ipdb.set_trace()
         x0 = self.network.low(x)
         #import ipdb;ipdb.set_trace()
         x1 = self.network.head1.layer4(x0.clone()) 

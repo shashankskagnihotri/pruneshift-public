@@ -281,7 +281,6 @@ class ResNet(nn.Module):
         # See note [TorchScript super()]
 
         is_feat = self.is_feat
-        #is_feat = False
         preact = False
         #print(x)
         x = self.conv1(x)

@@ -5,11 +5,12 @@ import timm.models as timm_models
 import scalable_resnet 
 
 import models as custom_models
+import cifar_resnet as cifar
 from .teachers import Teacher
 from .utils import ImagenetSubsetWrapper 
 
 
-RESNET_CLASSES = (tv_models.ResNet, custom_models.ResNet, timm_models.ResNet, scalable_resnet.ResNet)
+RESNET_CLASSES = (cifar.ResNet, tv_models.ResNet, custom_models.ResNet, timm_models.ResNet, scalable_resnet.ResNet)
 
 
 def _unwrap(network: nn.Module):

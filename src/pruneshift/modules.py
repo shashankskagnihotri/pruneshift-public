@@ -67,7 +67,7 @@ class VisionModule(pl.LightningModule):
         train_loss: nn.Module = None,
         optimizer_fn=optim.Adam,
         scheduler_fn=None,
-        multiheaded: bool = False
+        multiheaded: bool = True
     ):
 
         super(VisionModule, self).__init__()
@@ -78,15 +78,16 @@ class VisionModule(pl.LightningModule):
         self.optimizer_fn = optimizer_fn
         self.scheduler_fn = scheduler_fn
         self.multiheaded = multiheaded
-        #self.multiheaded = True
+        self.multiheaded = True
+        #self.multiheaded = False
 
         # Prepare the metrics.
         self.test_labels = [f"acc_{l}" for l in self.datamodule.labels]
         self.test_acc = nn.ModuleDict({l: Accuracy() for l in self.test_labels})
 
-        self.calibrator = calibrate(self.network)
-        self.calibrate_model = True
-        #self.calibrate_model = False
+        #self.calibrator = calibrate(self.network)
+        #self.calibrate_model = True
+        self.calibrate_model = False
 
     # @rank_zero_only
     def model_stats(self):
