@@ -1,6 +1,10 @@
-# This code is the public fork from [JasperHoffmann/pruneshift](https://github.com/JasperHoffmann/pruneshift) with some changes. 
+# GitHub repo used for [Towards Improving Robustness of Compressed CNNs](https://lmb.informatik.uni-freiburg.de/Publications/2021/SB21/), ICML UDL, 2021 by [Jasper Hoffmann](https://nr.uni-freiburg.de/people/jasper-hoffmann)\*, [Shashank Agnihotri](https://www.uni-mannheim.de/dws/people/researchers/phd-students/shashank/)\*, [Tonmoy Saikia](https://scholar.google.de/citations?user=HHv75fUAAAAJ&hl=en), [Thomas Brox](https://lmb.informatik.uni-freiburg.de/people/brox/).
+
+## This code is the public fork from [JasperHoffmann/pruneshift](https://github.com/JasperHoffmann/pruneshift) with some changes. 
 
 ## [Jasper Hoffmann](https://nr.uni-freiburg.de/people/jasper-hoffmann) was the one majorly responsible for development of this codebase with some modifications from me.
+
+# How to use the repository
 
 1. Steps to integrate Knowledge distillation.
     1. Define a new loss module in src/pruneshift/losses.py
