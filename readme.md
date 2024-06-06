@@ -1,3 +1,7 @@
+# This code is the public fork from [JasperHoffmann/pruneshift](https://github.com/JasperHoffmann/pruneshift) with some changes. 
+
+## [Jasper Hoffmann](https://nr.uni-freiburg.de/people/jasper-hoffmann) was the one majorly responsible for development of this codebase with some modifications from me.
+
 1. Steps to integrate Knowledge distillation.
     1. Define a new loss module in src/pruneshift/losses.py
     2. Add a configuration .yaml file to src/pruneshift/scripts/loss:
